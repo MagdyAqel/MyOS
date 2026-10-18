@@ -1,9 +1,13 @@
 import './style.css';
+import { setupBrowser } from './browser.js';
+import { setupGame } from './game.js';
 
 const apps = [
   {id:'files', name:'مستكشف الملفات', icon:'📁', color:'#ffcb55'},
   {id:'notes', name:'المفكرة', icon:'📝', color:'#92cfff'},
   {id:'calculator', name:'الحاسبة', icon:'▦', color:'#b9c8de'},
+  {id:'browser', name:'المتصفح', icon:'🌐', color:'#68c9f3'},
+  {id:'strategy', name:'قيادة الصحراء', icon:'🎖', color:'#f5cc83'},
   {id:'settings', name:'الإعدادات', icon:'⚙', color:'#adc7df'},
   {id:'about', name:'حول MyOS', icon:'◈', color:'#80cfff'},
 ];
@@ -22,7 +26,7 @@ root.innerHTML = `
   <section id="quick" class="glass hidden" aria-label="الإعدادات السريعة"><h3>الإعدادات السريعة</h3><div class="quick-grid"><button id="wifi" aria-pressed="true">◉<br>Wi-Fi</button><button id="quiet" aria-pressed="false">☾<br>عدم الإزعاج</button><button id="theme-quick">◐<br>المظهر</button></div><label>سطوع سطح المكتب<input id="brightness" aria-label="السطوع" type="range" min="45" max="100" value="100"></label><p class="muted">عناصر تجريبية داخل المحاكاة</p></section>
   <div id="toast" role="status" class="hidden"></div>
 </main>
-<footer id="taskbar" class="glass"><div class="weather"><span>☀</span><div>٢٤°<small>يوم جميل</small></div></div><nav class="task-apps" aria-label="شريط المهام"><button id="start-button" aria-label="ابدأ" aria-expanded="false"><span class="windows-logo"><i></i><i></i><i></i><i></i></span></button><button id="search-button" aria-label="بحث">⌕</button>${apps.slice(0,4).map(a=>`<button data-open="${a.id}" data-task="${a.id}" aria-label="${a.name}">${a.icon}</button>`).join('')}</nav><button id="tray" aria-label="فتح الإعدادات السريعة"><span>⌁ &nbsp; ◖ &nbsp; ▰</span><span id="clock"></span></button></footer>
+<footer id="taskbar" class="glass"><div class="weather"><span>☀</span><div>٢٤°<small>يوم جميل</small></div></div><nav class="task-apps" aria-label="شريط المهام"><button id="start-button" aria-label="ابدأ" aria-expanded="false"><span class="windows-logo"><i></i><i></i><i></i><i></i></span></button><button id="search-button" aria-label="بحث">⌕</button>${apps.filter(a=>a.id!=='about').map(a=>`<button data-open="${a.id}" data-task="${a.id}" aria-label="${a.name}">${a.icon}</button>`).join('')}</nav><button id="tray" aria-label="فتح الإعدادات السريعة"><span>⌁ &nbsp; ◖ &nbsp; ▰</span><span id="clock"></span></button></footer>
 <div id="lock-screen" class="hidden"><div><span class="eyebrow">MYOS</span><h2 id="lock-clock"></h2><p>مساحتك بانتظارك</p><button id="unlock">الدخول إلى سطح المكتب ←</button></div></div>`;
 
 function toast(message) { const el=document.querySelector('#toast'); el.textContent=message; el.classList.remove('hidden'); clearTimeout(toast.timer); toast.timer=setTimeout(()=>el.classList.add('hidden'),3000); }
@@ -51,17 +55,21 @@ function openApp(id){
   if(windows.has(id)){const w=windows.get(id);w.classList.remove('hidden');w.style.zIndex=++z;return;}
   const app=apps.find(a=>a.id===id);if(!app)return;
   const w=document.createElement('section');w.className='window glass';w.setAttribute('aria-label',app.name);w.style.zIndex=++z;
+  if(id==='strategy')w.classList.add('game-window','maximized');
+  if(id==='browser')w.classList.add('browser-window');
   w.style.left=`${Math.max(8,(innerWidth-Math.min(760,innerWidth-24))/2+windows.size*18)}px`;w.style.top=`${70+windows.size*24}px`;
   w.innerHTML=`<header class="titlebar"><span>${app.icon} &nbsp; ${app.name}</span><div class="window-controls"><button data-action="minimize" aria-label="تصغير">─</button><button data-action="maximize" aria-label="تكبير">□</button><button data-action="close" aria-label="إغلاق">×</button></div></header><div class="window-content"></div>`;
   document.querySelector('#windows').append(w);windows.set(id,w);document.querySelector(`[data-task="${id}"]`)?.classList.add('running');
   w.onpointerdown=()=>w.style.zIndex=++z;
-  w.querySelector('[data-action="close"]').onclick=()=>{w.remove();windows.delete(id);document.querySelector(`[data-task="${id}"]`)?.classList.remove('running');};
+  w.querySelector('[data-action="close"]').onclick=()=>{w.cleanup?.();w.remove();windows.delete(id);document.querySelector(`[data-task="${id}"]`)?.classList.remove('running');};
   w.querySelector('[data-action="minimize"]').onclick=()=>w.classList.add('hidden');
   const maximize=()=>w.classList.toggle('maximized');w.querySelector('[data-action="maximize"]').onclick=maximize;
   const bar=w.querySelector('.titlebar');bar.ondblclick=e=>{if(!e.target.closest('button'))maximize();};
   bar.onpointerdown=e=>{if(e.target.closest('button')||w.classList.contains('maximized'))return;const rect=w.getBoundingClientRect();const dx=e.clientX-rect.left,dy=e.clientY-rect.top;bar.setPointerCapture(e.pointerId);bar.onpointermove=m=>{w.style.left=`${Math.max(0,Math.min(innerWidth-100,m.clientX-dx))}px`;w.style.top=`${Math.max(0,Math.min(innerHeight-100,m.clientY-dy))}px`;};bar.onpointerup=()=>bar.onpointermove=null;bar.onpointercancel=()=>bar.onpointermove=null;};
   const content=w.querySelector('.window-content');
   if(id==='notes'){content.innerHTML='<div class="notes-toolbar"><span>ملاحظة شخصية</span><span id="save-state">تُحفظ تلقائيًا على هذا المتصفح</span></div><textarea aria-label="نص الملاحظة" placeholder="كل فكرة رائعة تبدأ بكلمة…"></textarea>';const area=content.querySelector('textarea');area.value=read('myos-note','');area.oninput=()=>save('myos-note',area.value);area.focus();}
+  if(id==='browser') w.cleanup=setupBrowser(content);
+  if(id==='strategy') w.cleanup=setupGame(content);
   if(id==='calculator') setupCalculator(content);
   if(id==='files') setupFiles(content);
   if(id==='settings'){content.innerHTML=`<div class="settings-page"><span class="eyebrow">MAKE IT YOURS</span><h2>مساحة تشبهك</h2><p class="muted">خصّص مظهر سطح المكتب.</p><h3>المظهر</h3><div class="theme-options"><button data-theme="dark">🌙 &nbsp; ليلي</button><button data-theme="light">☀ &nbsp; نهاري</button></div><h3>الخلفية</h3><div class="wallpapers"><button data-wall="blue" aria-label="خلفية زرقاء"></button><button data-wall="purple" aria-label="خلفية بنفسجية"></button><button data-wall="green" aria-label="خلفية خضراء"></button></div><p class="muted">تُحفظ تفضيلاتك محليًا، ولا تحتاج إلى حساب.</p></div>`;content.querySelectorAll('[data-theme]').forEach(b=>b.onclick=()=>setTheme(b.dataset.theme));content.querySelectorAll('[data-wall]').forEach(b=>b.onclick=()=>setWallpaper(b.dataset.wall));}

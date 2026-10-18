@@ -1,0 +1,42 @@
+import { test, expect } from '@playwright/test';
+test('browser navigation, safe URLs and embedded content',async({page})=>{
+ await page.route('https://example.com/**',route=>route.fulfill({contentType:'text/html',body:'<h1>Embedded test page</h1>'}));
+ await page.goto('/');await page.locator('.desktop-icons [data-open="browser"]').click();
+ const address=page.getByRole('textbox',{name:'عنوان الموقع'});
+ await address.fill('example.com');await page.getByRole('button',{name:'انتقال',exact:true}).click();
+ await expect(page.frameLocator('.browser-frame').getByRole('heading')).toHaveText('Embedded test page');
+ await expect(page.getByRole('link',{name:'فتح خارجي'})).toHaveAttribute('href','https://example.com/');
+ await page.getByRole('button',{name:'رجوع',exact:true}).click();await expect(page.locator('.browser-home')).toBeVisible();
+ await page.getByRole('button',{name:'تقدم',exact:true}).click();await expect(page.locator('.browser-frame')).toBeVisible();
+ await address.fill('javascript:alert(1)');await page.getByRole('button',{name:'انتقال',exact:true}).click();
+ await expect(page.locator('.browser-notice')).toContainText('عنوان HTTPS صالح');
+ await expect(page.locator('.browser-frame')).toHaveAttribute('src','https://example.com/');
+});
+test('build, train, command, pause and reset the RTS mission',async({page})=>{
+ const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto('/');await page.locator('.desktop-icons [data-open="strategy"]').click();
+ const canvas=page.locator('canvas');await expect(canvas).toBeVisible();
+ const place=async(type,x,y)=>{await page.locator(`[data-build="${type}"]`).click();const box=await canvas.boundingBox();await canvas.click({position:{x:x/1000*box.width,y:y/620*box.height}});};
+ await expect(page.locator('[data-train="tank"]')).toBeDisabled();
+ await place('supply',320,150);await expect(page.locator('.rts-message')).toContainText('تم تجهيز مركز إمداد');
+ await place('power',320,450);await place('barracks',430,150);
+ await page.locator('[data-train="soldier"]').click();await expect(page.locator('[data-stat="army"]')).toContainText('الجيش 4');
+ await page.locator('[data-game="select"]').click();await expect(page.locator('[data-stat="army"]')).toContainText('المحدد 4');
+ await page.locator('[data-game="attack"]').click();await expect(page.locator('.rts-message')).toContainText('أمر هجوم');
+ await page.locator('[data-game="pause"]').click();await expect(page.locator('.rts-result')).toContainText('متوقفة');
+ await page.locator('[data-game="restart"]').click();await expect(page.locator('[data-stat="cash"]')).toHaveText('$2400');
+ await expect(page.locator('.rts-result')).toBeHidden();
+ await page.getByRole('button',{name:'إغلاق',exact:true}).click();await expect(canvas).toHaveCount(0);
+ await page.locator('.desktop-icons [data-open="strategy"]').click();await expect(page.locator('canvas')).toBeVisible();
+ expect(errors).toEqual([]);
+});
+test('new apps remain usable on a narrow phone',async({page})=>{
+ await page.setViewportSize({width:390,height:844});await page.goto('/');
+ await page.locator('.desktop-icons [data-open="browser"]').click();
+ await expect(page.getByRole('textbox',{name:'عنوان الموقع'})).toBeVisible();
+ await page.getByRole('button',{name:'إغلاق',exact:true}).click();
+ await page.locator('.desktop-icons [data-open="strategy"]').click();
+ const box=await page.locator('canvas').boundingBox();expect(box.width).toBeGreaterThan(300);expect(box.x+box.width).toBeLessThanOrEqual(390);
+ await page.locator('[data-game="select"]').click();await page.locator('[data-game="attack"]').click();
+ await expect(page.locator('.rts-message')).toContainText('أمر هجوم');
+});
