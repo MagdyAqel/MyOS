@@ -1,0 +1,51 @@
+import { test, expect } from '@playwright/test';
+test('start search, window controls, and persistent notes', async ({ page }) => {
+  const errors=[];page.on('pageerror', e=>errors.push(e.message));
+  await page.goto('/');
+  await page.getByRole('button',{name:'ابدأ',exact:true}).click();
+  await page.getByRole('textbox',{name:'البحث عن تطبيق'}).fill('المفكرة');
+  await page.locator('#app-grid').getByRole('button',{name:'المفكرة',exact:true}).click();
+  await page.getByRole('textbox',{name:'نص الملاحظة'}).fill('فكرة محفوظة');
+  await page.getByRole('button',{name:'تصغير',exact:true}).click();
+  await expect(page.locator('.window')).toBeHidden();
+  await page.locator('[data-task="notes"]').click();
+  await expect(page.getByRole('textbox',{name:'نص الملاحظة'})).toHaveValue('فكرة محفوظة');
+  await page.getByRole('button',{name:'تكبير',exact:true}).click();
+  await expect(page.locator('.window')).toHaveClass(/maximized/);
+  await page.reload();
+  await page.locator('.desktop-icons [data-open="notes"]').click();
+  await expect(page.getByRole('textbox',{name:'نص الملاحظة'})).toHaveValue('فكرة محفوظة');
+  expect(errors).toEqual([]);
+});
+test('calculator operations and division by zero',async({page})=>{
+  await page.goto('/');await page.locator('[data-task="calculator"]').click();
+  const keys=page.locator('.calc-keys');
+  for(const key of ['7','×','8','='])await keys.getByRole('button',{name:key,exact:true}).click();
+  await expect(page.locator('output')).toHaveText('56');
+  for(const key of ['C','8','÷','0','='])await keys.getByRole('button',{name:key,exact:true}).click();
+  await expect(page.locator('output')).toHaveText('خطأ');
+});
+test('folders, appearance persistence, and lock screen',async({page})=>{
+  await page.goto('/');await page.locator('[data-task="files"]').click();
+  await page.locator('.file-items').getByRole('button',{name:'التنزيلات'}).click();
+  await expect(page.locator('.file-items')).toContainText('هذا المجلد فارغ');
+  await page.getByRole('button',{name:'إغلاق',exact:true}).click();
+  await page.locator('[data-task="settings"]').click();
+  await page.getByRole('button',{name:'نهاري'}).click();
+  await page.getByRole('button',{name:'خلفية بنفسجية'}).click();
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-theme','light');
+  await expect(page.locator('html')).toHaveAttribute('data-wallpaper','purple');
+  await page.getByRole('button',{name:'ابدأ',exact:true}).click();
+  await page.getByRole('button',{name:'قفل سطح المكتب'}).click();
+  await expect(page.locator('#lock-screen')).toBeVisible();
+  await page.getByRole('button',{name:'الدخول إلى سطح المكتب'}).click();
+  await expect(page.locator('#lock-screen')).toBeHidden();
+});
+test('mobile desktop opens a usable app',async({page})=>{
+  await page.setViewportSize({width:390,height:844});await page.goto('/');
+  await page.locator('[data-task="notes"]').click();
+  await page.getByRole('textbox',{name:'نص الملاحظة'}).fill('هاتف');
+  const box=await page.locator('.window').boundingBox();
+  expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(390);
+});
