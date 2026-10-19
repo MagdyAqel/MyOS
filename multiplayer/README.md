@@ -1,6 +1,8 @@
 # مواجهة MyOS عبر الويب لشخصين
 
-الواجهة تبقى على GitHub Pages، وخادم الغرف يعمل على Cloudflare Workers مع Durable Objects. لا يحتاج اللاعبون إلى Supabase أو إنشاء حساب؛ يحتاج مالك المشروع إلى حساب Cloudflare لنشر الخادم. لم يُنشر الخادم الحي ما لم يُضبط عنوانه في `public/multiplayer.json`.
+الواجهة على [GitHub Pages](https://magdyaqel.github.io/MyOS/)، وخادم الغرف المنشور هو `https://myos-arena.iugteacher.workers.dev` على Cloudflare Workers مع Durable Objects. يحدد `public/multiplayer.json` عنوان الاتصال العام. لا يحتاج اللاعبون إلى Supabase أو إنشاء حساب؛ يستخدم مالك المشروع حساب Cloudflare لنشر الخادم وتحديثه.
+
+عند تحديث نسخة قديمة مثبّتة، افتح **تثبيت MyOS → تطبيق التحديث المتاح** ليستخدم الموقع إعداد الخادم الجديد. لا تمسح بيانات الموقع لتحديثه.
 
 ## التشغيل المحلي
 
