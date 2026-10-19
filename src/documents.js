@@ -88,7 +88,7 @@ export function sanitizeDocument(html) {
   for (const child of source.body.childNodes) walk(child, root);
   return root.innerHTML;
 }
-export function setupWriter(content) {
+export function setupWriter(content, { target = null } = {}) {
   let data = initialDocuments(),
     damaged = false;
   try {
@@ -97,6 +97,8 @@ export function setupWriter(content) {
   } catch {
     damaged = true;
   }
+  if (target && data.documents.some((d) => d.id === target.id))
+    data.activeId = target.id;
   content.innerHTML = `<div class="writer-app"><header class="writer-header"><select aria-label="المستند المحفوظ"></select><button data-doc="new">مستند جديد</button><label>استيراد نص أو HTML<input type="file" accept=".txt,.md,.html" aria-label="استيراد مستند"></label></header><input class="document-title" maxlength="120" aria-label="عنوان المستند"><nav class="writer-tools" aria-label="تنسيق المستند"><button data-format="bold" aria-label="خط عريض"><b>B</b></button><button data-format="italic" aria-label="خط مائل"><i>I</i></button><button data-format="underline" aria-label="تسطير"><u>U</u></button><button data-block="h2">عنوان</button><button data-block="p">فقرة</button><button data-format="insertUnorderedList">قائمة</button><button data-format="justifyCenter">توسيط</button><button data-doc="undo">تراجع</button><button data-doc="redo">إعادة</button><button data-doc="html">تنزيل مستند منسق</button><button data-doc="text">تنزيل TXT</button></nav><div class="document-paper" contenteditable="true" role="textbox" aria-label="نص المستند المنسق" aria-multiline="true" spellcheck="true"></div><footer class="document-status" role="status"></footer></div>`;
   const editor = content.querySelector(".document-paper"),
     title = content.querySelector(".document-title"),
@@ -271,8 +273,16 @@ export function setupWriter(content) {
       event.target.value = "";
     }
   };
+  function openItem(event) {
+    if (data.documents.some((d) => d.id === event.detail.id)) {
+      data.activeId = event.detail.id;
+      render();
+    }
+  }
+  content.addEventListener("myos:open-item", openItem);
   render();
   return () => {
+    content.removeEventListener("myos:open-item", openItem);
     closed = true;
   };
 }

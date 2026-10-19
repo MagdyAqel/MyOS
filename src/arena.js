@@ -1,3 +1,4 @@
+import qrcode from "qrcode-generator";
 import {
   MatchConnection,
   roomRequest,
@@ -8,7 +9,7 @@ import { MAPS } from "./maps.js";
 import "./cloud.css";
 let active = null;
 export function setupArena(content, { openGame }) {
-  content.innerHTML = `<div class="cloud-page arena-page"><span class="eyebrow">COMMAND HORIZON · ONLINE 1V1</span><h2>مواجهة عبر الويب لشخصين</h2><p>أنشئ غرفة وشارك رابط الدعوة، أو أدخل رمز غرفة صديقك. يبدأ القتال بعد اتصال الطرفين والضغط على «جاهز للمواجهة». كل لاعب يقود جيشه ويتحكم بموارده ومقرّه.</p><details class="arena-config"><summary>عنوان خادم اللعب</summary><label>خادم المواجهة<input type="url" aria-label="عنوان خادم اللعب" placeholder="https://myos-arena.example.workers.dev"></label><p>يحتاج هذا الوضع خادم Cloudflare Workers مستقلًا. موقع GitHub Pages وحده لا يشغّل الغرف. <a href="https://github.com/MagdyAqel/MyOS/blob/main/multiplayer/README.md" target="_blank" rel="noopener noreferrer">دليل الربط</a></p></details><label>خريطة غرفة جديدة<select aria-label="خريطة المواجهة">${MAPS.map((m) => `<option value="${m.id}">${m.name}</option>`).join("")}</select></label><button data-arena="create">إنشاء غرفة خاصة</button><label>رمز الغرفة أو رابط الدعوة<input aria-label="رمز الغرفة أو رابط الدعوة" autocomplete="off" spellcheck="false"></label><button data-arena="join">الانضمام إلى الغرفة</button><button data-arena="resume">استئناف الاتصال السابق</button><section class="arena-room hidden"><label>رابط دعوة صديقك<input readonly aria-label="رابط دعوة صديقك"></label><button data-arena="copy">نسخ الدعوة</button><p class="arena-players"></p><button data-arena="ready">جاهز للمواجهة</button><button data-arena="play">فتح ساحة المواجهة</button><button data-arena="leave">مغادرة الغرفة</button></section><p class="arena-status" role="status"></p><p>الغرفة لمقعدين فقط وتنتهي بعد ساعتين. تبقى المعركة متوقفة عند انقطاع أحد اللاعبين، ويُحسب الانسحاب بعد مهلة 60 ثانية. لا يحتاج اللاعبان إلى حساب؛ يُحفظ رمز استئناف المقعد في جلسة هذا المتصفح فقط. لا تشارك رمز الاستئناف. الحملة الفردية وحفظها منفصلان عن المواجهة.</p></div>`;
+  content.innerHTML = `<div class="cloud-page arena-page"><span class="eyebrow">COMMAND HORIZON · ONLINE 1V1</span><h2>مواجهة عبر الويب لشخصين</h2><p>أنشئ غرفة وشارك رابط الدعوة، أو أدخل رمز غرفة صديقك. يبدأ القتال بعد اتصال الطرفين والضغط على «جاهز للمواجهة». كل لاعب يقود جيشه ويتحكم بموارده ومقرّه.</p><details class="arena-config"><summary>عنوان خادم اللعب</summary><label>خادم المواجهة<input type="url" aria-label="عنوان خادم اللعب" placeholder="https://myos-arena.example.workers.dev"></label><p>يحتاج هذا الوضع خادم Cloudflare Workers مستقلًا. موقع GitHub Pages وحده لا يشغّل الغرف. <a href="https://github.com/MagdyAqel/MyOS/blob/main/multiplayer/README.md" target="_blank" rel="noopener noreferrer">دليل الربط</a></p></details><label>اسم القائد<input aria-label="اسم القائد" maxlength="32" autocomplete="nickname" placeholder="اسمك في المواجهة"></label><label>المال لكل لاعب في غرفة جديدة<input type="number" min="1000" max="100000" step="100" value="2400" aria-label="مال بداية المواجهة"></label><label>خريطة غرفة جديدة<select aria-label="خريطة المواجهة">${MAPS.map((m) => `<option value="${m.id}">${m.name}</option>`).join("")}</select></label><button data-arena="create">إنشاء غرفة خاصة</button><label>رمز الغرفة أو رابط الدعوة<input aria-label="رمز الغرفة أو رابط الدعوة" autocomplete="off" spellcheck="false"></label><button data-arena="join">الانضمام إلى الغرفة</button><button data-arena="resume">استئناف الاتصال السابق</button><section class="arena-room hidden"><label>رابط دعوة صديقك<input readonly aria-label="رابط دعوة صديقك"></label><button data-arena="copy">نسخ الدعوة</button><div class="arena-qr" aria-label="رمز QR للدعوة"></div><p class="arena-players"></p><p class="arena-latency"></p><button data-arena="ready">جاهز للمواجهة</button><button data-arena="play">فتح ساحة المواجهة</button><button data-arena="surrender">استسلام</button><button data-arena="rematch">طلب إعادة المواجهة</button><button data-arena="leave">مغادرة الغرفة</button></section><p class="arena-status" role="status"></p><p>الغرفة لمقعدين فقط وتنتهي بعد ساعتين. تبقى المعركة متوقفة عند انقطاع أحد اللاعبين، ويُحسب الانسحاب بعد مهلة 60 ثانية. لا يحتاج اللاعبان إلى حساب؛ يُحفظ رمز استئناف المقعد في جلسة هذا المتصفح فقط. لا تشارك رمز الاستئناف. الحملة الفردية وحفظها منفصلان عن المواجهة.</p></div>`;
   const endpoint = content.querySelector('[aria-label="عنوان خادم اللعب"]'),
     code = content.querySelector('[aria-label="رمز الغرفة أو رابط الدعوة"]'),
     status = content.querySelector(".arena-status"),
@@ -99,6 +100,20 @@ export function setupArena(content, { openGame }) {
       content.querySelector("[data-arena=play]").disabled = false;
       content.querySelector("[data-arena=ready]").disabled =
         state.players[connection.session.side].ready || state.phase === "ended";
+      content.querySelector(".arena-latency").textContent =
+        `${state.players.blue.name || "اللاعب الأول"} × ${state.players.red.name || "اللاعب الثاني"} · المال الأولي $${state.battle?.startingCash || 2400} · ${connection.latency === null ? "قياس الاتصال…" : `${connection.latency} ms · ${connection.latency < 120 ? "اتصال جيد" : connection.latency < 300 ? "اتصال متوسط" : "اتصال بطيء"}`}`;
+      content.querySelector("[data-arena=surrender]").disabled = ![
+        "playing",
+        "paused",
+        "countdown",
+      ].includes(state.phase);
+      const rematch = content.querySelector("[data-arena=rematch]");
+      rematch.disabled =
+        state.phase !== "ended" ||
+        state.players[connection.session.side].rematch;
+      rematch.textContent = state.players[connection.session.side].rematch
+        ? "بانتظار موافقة الخصم"
+        : "طلب إعادة المواجهة";
     } else content.querySelector("[data-arena=play]").disabled = true;
   }
   function detach() {
@@ -111,6 +126,11 @@ export function setupArena(content, { openGame }) {
   }
   function attach(session) {
     detach();
+    session.name ||=
+      content
+        .querySelector('[aria-label="اسم القائد"]')
+        .value.trim()
+        .slice(0, 32) || "";
     if (
       active &&
       !active.closed &&
@@ -135,6 +155,14 @@ export function setupArena(content, { openGame }) {
       server: session.endpoint,
     }).toString();
     content.querySelector('[aria-label="رابط دعوة صديقك"]').value = link.href;
+    const qr = qrcode(0, "M");
+    qr.addData(link.href);
+    qr.make();
+    content.querySelector(".arena-qr").innerHTML = qr.createSvgTag({
+      cellSize: 3,
+      margin: 12,
+      scalable: true,
+    });
     observe();
   }
   async function run(operation) {
@@ -162,6 +190,9 @@ export function setupArena(content, { openGame }) {
       const session = await roomRequest(endpoint.value, "/rooms", {
         stage: map.stage,
         map: map.id,
+        startingCash: Number(
+          content.querySelector('[aria-label="مال بداية المواجهة"]').value,
+        ),
       });
       if (!closed) attach(session);
     });
@@ -204,6 +235,10 @@ export function setupArena(content, { openGame }) {
   content.querySelector("[data-arena=play]").onclick = () => {
     if (connection?.state) openGame(connection);
   };
+  content.querySelector("[data-arena=surrender]").onclick = () =>
+    connection?.send({ type: "surrender" });
+  content.querySelector("[data-arena=rematch]").onclick = () =>
+    connection?.send({ type: "rematch" });
   content.querySelector("[data-arena=leave]").onclick = () => {
     connection?.close();
     detach();

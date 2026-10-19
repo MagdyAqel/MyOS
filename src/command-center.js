@@ -1,3 +1,4 @@
+import { FORCE_PHASES, OPERATION_PHASES } from "./campaign.js";
 import {
   FORMATIONS,
   relocateHQ,
@@ -13,6 +14,8 @@ import {
   nextOperation,
   awardOperation,
   buyUpgrade,
+  secondaryGoal,
+  unlockedEquipment,
 } from "./career.js";
 import "./upgrade.css";
 export function setupCommandCenter(
@@ -27,6 +30,7 @@ export function setupCommandCenter(
     .map(([k, v]) => `<option value="${k}">${v}</option>`)
     .join("")}</select></label><div class="tactic-modes">${[
     ["move", "تحرك"],
+    ["attackMove", "تقدم هجومي"],
     ["patrol", "دورية"],
     ["guard", "حماية هدف"],
   ]
@@ -68,11 +72,22 @@ export function setupCommandCenter(
       index = career.completed.length;
     const op = OPERATIONS[index];
     if (op)
-      start(op.stage, op.map, null, {
-        operationId: op.id,
-        mission: op.mission,
-        upgrades: career.upgrades,
-      });
+      content.dispatchEvent(
+        new CustomEvent("myos:briefing", {
+          detail: {
+            operationId: op.id,
+            story: `${FORCE_PHASES[OPERATION_PHASES[op.id]].name} — ${op.title}: ${op.story}`,
+            launch: (startingCash) =>
+              start(op.stage, op.map, null, {
+                operationId: op.id,
+                mission: op.mission,
+                upgrades: career.upgrades,
+                startingCash,
+                equipment: unlockedEquipment(career),
+              }),
+          },
+        }),
+      );
   }
   panel.querySelector("[data-career=start]").onclick = () => runOperation();
   panel.querySelector("[data-tactic=relocate]").onclick = () => {
@@ -188,7 +203,7 @@ export function setupCommandCenter(
     history.replaceChildren();
     for (const report of career.reports || []) {
       const p = document.createElement("p");
-      p.textContent = `${OPERATIONS.find((o) => o.id === report.id)?.title || "تقرير"} · ${report.time} ث · أهداف ${report.kills} · خسائر ${report.losses}`;
+      p.textContent = `${OPERATIONS.find((o) => o.id === report.id)?.title || "تقرير"} · ${"★".repeat(report.stars || 1)} · ${report.time} ث · أهداف ${report.kills} · خسائر ${report.losses}`;
       history.append(p);
     }
     const list = panel.querySelector(".operation-list");
@@ -197,7 +212,7 @@ export function setupCommandCenter(
       OPERATIONS.forEach((o, i) => {
         const li = document.createElement("li"),
           button = document.createElement("button");
-        button.textContent = `${i + 1}. ${o.title}`;
+        button.textContent = `${i + 1}. ${o.title} · ${FORCE_PHASES[OPERATION_PHASES[o.id]].name.split(" · ")[1]}`;
         button.disabled = i > career.completed.length;
         button.dataset.operation = o.id;
         button.onclick = () => runOperation(i);
@@ -206,9 +221,11 @@ export function setupCommandCenter(
       });
       list.dataset.completed = String(career.completed.length);
     }
+    const gear = unlockedEquipment(career);
+    const gearText = `التجهيزات: ${gear.reinforced ? "ذخيرة موسعة ✓" : "ذخيرة موسعة (نجمتان)"} · ${gear.precision ? "محدد مدى ✓" : "محدد مدى (5 نجوم)"} · ${gear.veteran ? "بصريات محسنة ✓" : "بصريات محسنة (8 نجوم)"}`;
     const op = nextOperation(career);
     panel.querySelector(".career-story").textContent = op
-      ? `${career.completed.length + 1}/${OPERATIONS.length} · ${op.title}: ${op.story}`
+      ? `${career.completed.length + 1}/${OPERATIONS.length} · ${op.title}: ${op.story} · ${gearText}`
       : "أتممت الحملة. يمكن إعادة تجربة الخرائط في التدريب الحر.";
     panel.querySelector(".career-progress").textContent =
       `خبرة: ${career.xp} · نقاط ترقية: ${career.points} · عمليات مكتملة: ${career.completed.length}/${OPERATIONS.length}`;
@@ -219,7 +236,7 @@ export function setupCommandCenter(
       button.disabled = career.points < 1 || career.upgrades[key] >= 3;
     }
     panel.querySelector(".battle-report").textContent =
-      `المعركة الحالية: إصابات ${b.stats.shots} · أهداف مدمرة ${b.stats.kills} · خسائر ${b.stats.losses} · ${Math.floor(b.time)} ث`;
+      `${b.operationId ? `هدف إضافي: ${secondaryGoal(b).text} ${secondaryGoal(b).met ? "✓" : "○"} · خسائر لا تتجاوز 3: ${b.stats.losses <= 3 ? "✓" : "○"}. ` : ""}المعركة الحالية: إصابات ${b.stats.shots} · أهداف مدمرة ${b.stats.kills} · خسائر ${b.stats.losses} · ${Math.floor(b.time)} ث`;
   }
   return {
     restart() {
@@ -228,6 +245,8 @@ export function setupCommandCenter(
         operationId: b.operationId,
         mission: b.mission.id,
         upgrades: career.upgrades,
+        startingCash: b.startingCash,
+        equipment: unlockedEquipment(career),
       });
     },
     refresh: update,

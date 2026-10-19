@@ -1,0 +1,271 @@
+/* Field-first command surface: one compact toolbar, a folding operations dock. */
+.game-window .rts-app {
+  background: #0c1822;
+  color: #dbe8f0;
+}
+.game-window .rts-header {
+  background: linear-gradient(110deg, #122c3d, #10202b);
+  border-bottom: 1px solid #315063;
+  min-height: 48px;
+}
+.game-window .rts-header strong {
+  letter-spacing: 0.3px;
+}
+.game-window .rts-stats span {
+  background: #ffffff08;
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.game-window .rts-app button {
+  border-radius: 7px;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+.game-window .rts-app button:focus-visible {
+  outline: 2px solid #86ddff;
+  outline-offset: 2px;
+}
+.game-window .rts-app button[aria-pressed="true"] {
+  border-color: #86ddff;
+  background: #204b60;
+}
+.game-window .battlefield {
+  position: relative;
+}
+.game-window .field-expand {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  z-index: 5;
+  min-height: 36px;
+  padding: 7px 12px;
+  background: #102b3de8;
+  font-size: 11px;
+  backdrop-filter: blur(8px);
+}
+.game-window .scene-badge {
+  display: none;
+}
+.game-window .force-ribbon {
+  position: absolute;
+  top: 13px;
+  right: 12px;
+  padding: 7px 10px;
+  background: #102b3ddc;
+  border: 1px solid #769caf50;
+  border-radius: 7px;
+  color: #b8e5ee;
+  font-size: 11px;
+  pointer-events: none;
+  max-width: 52%;
+  line-height: 1.4;
+}
+.game-window .battle-actions {
+  background: #102330;
+  justify-content: flex-start;
+  gap: 6px;
+  border-top: 1px solid #315063;
+}
+.game-window .battle-actions button {
+  flex: 1;
+}
+.game-window .rts-footer {
+  background: #0d1c26;
+}
+.game-window .rts-panel {
+  background: #12242f;
+}
+.game-window .rts-panel h3 {
+  font-size: 12px;
+  color: #c7e7f0;
+  border-bottom: 1px solid #35505b;
+  padding-bottom: 8px;
+}
+.game-window .panel-jumps {
+  background: #12242ff5;
+  gap: 4px;
+}
+.game-window .rts-help {
+  font-size: 11px;
+  line-height: 1.7;
+}
+.game-window .battle-wide .rts-instructions {
+  display: none;
+}
+@media (min-width: 651px) and (min-height: 501px) and (pointer: fine),
+  (min-width: 1025px) and (min-height: 501px) {
+  .game-window .rts-app .rts-layout {
+    grid-template-columns: minmax(0, 1fr) 238px;
+  }
+  .game-window .rts-app:not(.commands-open) .rts-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .game-window .rts-app:not(.commands-open) .rts-panel {
+    display: none;
+  }
+  .game-window .rts-app .campaign-bar {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 12px;
+    padding: 6px 10px;
+    max-height: 66px;
+    min-height: 48px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    align-items: center;
+    background: #122633;
+    border-bottom: 1px solid #315063;
+    scrollbar-width: thin;
+    scrollbar-color: #557c8d transparent;
+  }
+  .game-window .rts-app:not(.maps-open) .campaign-bar {
+    display: none;
+  }
+  .game-window .campaign-bar label,
+  .game-window .campaign-bar .save-controls,
+  .game-window .campaign-progress,
+  .game-window .campaign-bar > button {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+  .game-window .campaign-bar label {
+    gap: 6px;
+    font-size: 10px;
+  }
+  .game-window .campaign-bar label:first-child select {
+    max-width: 155px;
+  }
+  .game-window .campaign-bar .battle-save-status {
+    display: none;
+  }
+  .game-window .rts-header .sound-controls {
+    gap: 5px;
+  }
+  .game-window .rts-header .sound-controls label {
+    display: flex;
+  }
+  .game-window .rts-header button {
+    padding: 7px 9px;
+    font-size: 11px;
+  }
+  .game-window .rts-header .rts-stats {
+    gap: 6px;
+  }
+  .game-window .rts-app .rts-instructions {
+    padding: 4px 12px;
+    font-size: 10px;
+    max-height: 100px;
+    overflow: auto;
+  }
+  .game-window .online-match-status {
+    margin: 0;
+    padding: 5px 12px;
+    font-size: 11px;
+  }
+  .game-window .online-match-actions {
+    position: absolute;
+    right: 12px;
+    top: 62px;
+    z-index: 5;
+    padding: 0;
+  }
+}
+@media (max-width: 650px),
+  (max-width: 950px) and (max-height: 500px),
+  (pointer: coarse) and (max-width: 1024px) {
+  .game-window .field-expand {
+    min-height: 44px;
+    top: 8px;
+    padding: 6px 10px;
+    font-size: 10px;
+  }
+  .game-window .force-ribbon {
+    top: 9px;
+    font-size: 9px;
+    max-width: 50%;
+    padding: 6px 8px;
+  }
+  .game-window .touch-hint {
+    top: 58px;
+    font-size: 9px;
+    pointer-events: none;
+  }
+  .game-window .rts-stats span {
+    background: none;
+    padding: 0;
+  }
+  .game-window .rts-header {
+    min-height: 58px;
+  }
+  .game-window .battle-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .game-window .battle-actions button {
+    padding: 7px 5px;
+    min-height: 44px;
+  }
+  .game-window .rts-app .online-match-status {
+    margin: 0;
+    padding: 3px 8px;
+    font-size: 9px;
+    max-height: 34px;
+    overflow: auto;
+    flex-shrink: 0;
+  }
+  .game-window .online-match-actions {
+    padding: 2px 8px;
+    flex-shrink: 0;
+  }
+  .game-window .online-match-actions button {
+    min-height: 36px;
+    font-size: 10px;
+  }
+}
+@media (max-width: 950px) and (max-height: 500px) {
+  .game-window .battle-actions {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .game-window .field-expand {
+    top: 6px;
+  }
+  .game-window .force-ribbon {
+    top: 6px;
+  }
+}
+
+@media (min-width: 651px) and (max-width: 1000px) {
+  .game-window .rts-header .sound-controls label {
+    display: none;
+  }
+}
+
+.game-window .campaign-launch {
+  display: block;
+  width: 100%;
+  margin: 8px 0 12px;
+  min-height: 44px;
+  border-color: #9ec6b6;
+  background: #234a44;
+  color: #e8f4de;
+  font-size: 12px;
+}
+
+.game-window .network-match .rts-header > [data-game] {
+  display: none;
+}
+.game-window .network-match .rts-header .online-match-actions {
+  position: static;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 5px;
+  padding: 0;
+  align-items: center;
+}
+.game-window .network-match .rts-header .online-match-actions button {
+  min-height: 38px;
+  max-width: 100px;
+  font-size: 11px;
+}

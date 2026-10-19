@@ -18,11 +18,15 @@ async function savedGame(page) {
     "webgl",
   );
   const maps = page.locator("[data-game=maps]");
-  if (await maps.isVisible()) await maps.click();
+  if ((await maps.getAttribute("aria-expanded")) !== "true") await maps.click();
   await page.locator("[data-game=resume]").click();
   await page.locator("[data-game=pause]").click();
   if (
-    (await maps.isVisible()) &&
+    (await page.evaluate(
+      () =>
+        matchMedia("(max-width:650px),(max-width:950px) and (max-height:500px)")
+          .matches,
+    )) &&
     (await maps.getAttribute("aria-expanded")) === "true"
   )
     await maps.click();
@@ -71,10 +75,13 @@ test("recon can be sent to a precise area through the tactical map and saves its
   await page.locator("[data-select-type=recon]").click();
   await page.locator("[data-ability=recon]").click();
   const map = page.locator(".battle-minimap");
-  const position = await map.evaluate(element => {
+  const position = await map.evaluate((element) => {
     const svg = element.querySelector("svg").getBoundingClientRect();
     const button = element.getBoundingClientRect();
-    return { x: svg.x - button.x - element.clientLeft + svg.width * .82, y: svg.y - button.y - element.clientTop + svg.height * .76 };
+    return {
+      x: svg.x - button.x - element.clientLeft + svg.width * 0.82,
+      y: svg.y - button.y - element.clientTop + svg.height * 0.76,
+    };
   });
   await map.click({
     position,
@@ -105,6 +112,7 @@ for (const size of [
     expect(Math.abs(canvas.height - panel.height)).toBeLessThan(2);
     expect(canvas.height).toBeGreaterThan(240);
     expect(canvas.y + canvas.height).toBeLessThan(size.height - 58);
+    await page.locator("[data-select-type=soldier]").click();
     await page.locator('[data-panel-jump="النقل"]').click();
     await expect(
       page.getByRole("combobox", { name: "الناقلة المستهدفة" }),
@@ -118,6 +126,7 @@ test("phone can use transport controls with touch targets and return to the batt
   await page.setViewportSize({ width: 390, height: 844 });
   await savedGame(page);
   await page.locator("[data-game=commands]").click();
+  await page.locator("[data-select-type=soldier]").click();
   await page.locator('[data-panel-jump="النقل"]').click();
   const button = page.locator("[data-ability=board]");
   await expect(button).toBeInViewport();
@@ -144,10 +153,11 @@ test("campaign lists ten operations and an existing eight-operation save starts 
   await page.locator("[data-task=strategy]").click();
   await page.locator(".career-details summary").click();
   await expect(page.locator(".operation-list button")).toHaveCount(10);
-  await page.locator("[data-career=start]").click();
+  await page.locator("[data-game=campaign]").click();
+  await page.locator(".battle-setup button[value=start]").click();
   await expect(page.locator(".mission-objective")).toContainText("استطلاع");
   await expect(
     page.getByRole("combobox", { name: "اختيار الخريطة", exact: true }),
-  ).toHaveValue("watchtower");
+  ).toHaveValue("archipelago");
   await expect(page.locator(".career-progress")).toContainText("8/10");
 });

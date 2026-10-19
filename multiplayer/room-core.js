@@ -1,3 +1,4 @@
+import { advancedOrder, startingMoney } from "../src/battle-expansion.js";
 import { Battle } from "../src/battle.js";
 import { snapshotBattle, restoreBattle } from "../src/battle-save.js";
 import { MAPS } from "../src/maps.js";
@@ -14,13 +15,15 @@ const settings = () => ({
   rally: null,
 });
 export class RoomCore {
-  constructor({ stage = 0, map } = {}) {
+  constructor({ stage = 0, map, startingCash } = {}) {
     if (
       !Number.isInteger(stage) ||
       !MAPS.some((m) => m.stage === stage && m.id === map)
     )
       throw Error("خريطة غير صالحة");
-    this.battle = new Battle(stage, map);
+    if (startingCash !== undefined && startingMoney(startingCash, -1) === -1)
+      throw Error("مال البداية غير صالح");
+    this.battle = new Battle(stage, map, { startingCash });
     const b = this.battle;
     b.entities = b.entities.filter((e) => e.team === "blue");
     for (const unit of [...b.entities])
@@ -77,6 +80,9 @@ export class RoomCore {
         "board",
         "unload",
         "recon",
+        "hold",
+        "retreat",
+        "priority",
       ].includes(action.kind)
     )
       throw Error("أمر غير مسموح");
@@ -109,7 +115,9 @@ export class RoomCore {
       own.formation = action.formation;
     }
     if (action.commandMode !== undefined) {
-      if (!["move", "guard", "patrol"].includes(action.commandMode))
+      if (
+        !["move", "attackMove", "guard", "patrol"].includes(action.commandMode)
+      )
         throw Error("وضع أمر غير صالح");
       own.commandMode = action.commandMode;
     }
@@ -152,6 +160,8 @@ export class RoomCore {
                 break outer;
               }
         }
+      } else if (["hold", "retreat", "priority"].includes(action.kind)) {
+        ok = advancedOrder(b, action);
       } else if (["board", "unload", "recon"].includes(action.kind)) {
         ok = specialAction(b, action);
       } else if (action.kind === "command") {

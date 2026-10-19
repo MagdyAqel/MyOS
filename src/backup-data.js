@@ -1,3 +1,4 @@
+import { validateMediaRecords } from "./media-store.js";
 import { parseNotebook } from "./notebook.js";
 import { parseFiles } from "./file-store.js";
 import { restoreBattle } from "./battle-save.js";
@@ -101,6 +102,20 @@ export function validateBackup(raw) {
         throw Error("مستوى صوت غير صالح");
     }
   }
+  if (data.media !== undefined) {
+    validateMediaRecords(data.media);
+    for (const r of data.media) {
+      if (
+        typeof r.base64 !== "string" ||
+        r.base64.length % 4 !== 0 ||
+        !/^[a-zA-Z0-9+/]*={0,2}$/.test(r.base64) ||
+        (r.base64.length * 3) / 4 -
+          (r.base64.endsWith("==") ? 2 : r.base64.endsWith("=") ? 1 : 0) !==
+          r.size
+      )
+        throw Error("محتوى وسائط النسخة غير صالح");
+    }
+  }
   const wall = data.wallpaper;
   if (
     wall !== null &&
@@ -130,6 +145,7 @@ export function collectBackup(storage, wallpaper = null) {
 export function backupSummary(data) {
   const d = data.datasets;
   return {
+    media: data.media?.length || 0,
     notes: d["myos-notebook-v2"]
       ? parseNotebook(d["myos-notebook-v2"]).notes.length
       : 0,

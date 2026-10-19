@@ -1,7 +1,7 @@
 import "./features.css";
 import { loadNotebook, persistNotebook, NOTEBOOK_KEY } from "./notebook.js";
 
-export function setupNotes(content) {
+export function setupNotes(content, {target=null}={}) {
   let storage;
   try {
     storage = window.localStorage;
@@ -15,6 +15,7 @@ export function setupNotes(content) {
   }
   const loaded = loadNotebook(storage);
   let data = loaded.data;
+  if(target && data.notes.some(n=>n.id===target.id))data.activeId=target.id;
   content.innerHTML = `<div class="notebook"><aside class="notes-sidebar"><div><strong>دفتر ملاحظاتي</strong><button data-note="new" aria-label="ملاحظة جديدة">＋</button></div><input class="notes-search" aria-label="البحث في الملاحظات" placeholder="ابحث في العناوين والنصوص"><nav aria-label="الملاحظات المحفوظة"></nav><p>محفوظة على هذا المتصفح.<br>نزّل نسخة للاحتفاظ بها خارج الجهاز.</p></aside><div class="notes-editor"><header><input aria-label="عنوان الملاحظة" maxlength="120" placeholder="عنوان الملاحظة"><button data-note="download">تنزيل نص</button></header><textarea aria-label="نص الملاحظة" placeholder="كل فكرة رائعة تبدأ بكلمة…" spellcheck="true"></textarea><footer><span class="notes-save-state" role="status"></span><span class="notes-count"></span></footer></div></div>`;
   const area = content.querySelector("textarea"),
     title = content.querySelector('[aria-label="عنوان الملاحظة"]');
@@ -97,10 +98,12 @@ export function setupNotes(content) {
     render();
     status.textContent = "تم تحديث الملاحظات من تبويب آخر";
   };
+  function openItem(event){if(data.notes.some(n=>n.id===event.detail.id)){data.activeId=event.detail.id;content.querySelector(".notes-search").value="";render();}}
+  content.addEventListener("myos:open-item",openItem);
   window.addEventListener("storage", sync);
   render();
   save();
   if (loaded.recovered)
     status.textContent = "استُعيدت الملاحظات من النسخة المحلية الاحتياطية";
-  return () => window.removeEventListener("storage", sync);
+  return () => {window.removeEventListener("storage", sync);content.removeEventListener("myos:open-item",openItem);};
 }

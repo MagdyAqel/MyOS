@@ -129,7 +129,10 @@ export class ArenaRoom {
   phase() {
     if (this.core?.battle.status !== "playing") return "ended";
     if (!this.doc.started) return "waiting";
-    return this.online("blue") && this.online("red") ? "playing" : "paused";
+    if (!this.online("blue") || !this.online("red")) return "paused";
+    return Date.now() < (this.doc.countdownUntil || 0)
+      ? "countdown"
+      : "playing";
   }
   async save() {
     if (this.doc && this.core) {
@@ -157,37 +160,57 @@ export class ArenaRoom {
           room: this.doc.room,
           side: peer.team,
           phase,
+          countdown:
+            phase === "countdown"
+              ? Math.ceil((this.doc.countdownUntil - Date.now()) / 1000)
+              : 0,
+          match: this.doc.match || 1,
           players: {
             blue: {
               connected: this.online("blue"),
               ready: !!this.doc.players.blue?.ready,
+              name: this.doc.players.blue?.name || "اللاعب الأول",
+              rematch: !!this.doc.players.blue?.rematch,
             },
             red: {
               connected: this.online("red"),
               ready: !!this.doc.players.red?.ready,
+              name: this.doc.players.red?.name || "اللاعب الثاني",
+              rematch: !!this.doc.players.red?.rematch,
             },
           },
           battle: this.core.view(peer.team),
-          events: events.filter(
-            (e) =>
-              [
-                "shot",
-                "explosion",
-                "build",
-                "train",
-                "victory",
-                "defeat",
-              ].includes(e.kind) &&
-              (!Number.isFinite(e.x) ||
-                this.core.battle.isVisible(
-                  {
-                    x: e.x,
-                    y: e.y,
-                    team: peer.team === "blue" ? "red" : "blue",
-                  },
-                  peer.team,
-                )),
-          ),
+          events: events
+            .filter(
+              (e) =>
+                [
+                  "shot",
+                  "explosion",
+                  "build",
+                  "train",
+                  "support",
+                  "victory",
+                  "defeat",
+                ].includes(e.kind) &&
+                (!Number.isFinite(e.x) ||
+                  this.core.battle.isVisible(
+                    {
+                      x: e.x,
+                      y: e.y,
+                      team: peer.team === "blue" ? "red" : "blue",
+                    },
+                    peer.team,
+                  )),
+            )
+            .map((event) => ({
+              ...event,
+              kind:
+                peer.team === "red" && event.kind === "victory"
+                  ? "defeat"
+                  : peer.team === "red" && event.kind === "defeat"
+                    ? "victory"
+                    : event.kind,
+            })),
         });
   }
   sync() {
@@ -211,6 +234,7 @@ export class ArenaRoom {
       return;
     }
     const phase = this.phase();
+    this.core.battle.paused = phase !== "playing";
     if (phase === "playing") {
       const elapsed = Math.min(0.3, (now - this.lastTick) / 1000);
       for (let rest = elapsed; rest > 0.001; rest -= 0.05)
@@ -292,6 +316,12 @@ export class ArenaRoom {
         createdAt: Date.now(),
         expiresAt: Date.now() + 2 * 3600000,
         started: false,
+        match: 1,
+        rules: {
+          stage: this.core.battle.stageIndex,
+          map: this.core.battle.map.id,
+          startingCash: this.core.battle.startingCash,
+        },
         players: {
           blue: { token: secret, ready: false, disconnectedAt: Date.now() },
         },
@@ -356,6 +386,13 @@ export class ArenaRoom {
                 s.close(1000, "Session replaced");
               }
             peer.team = team;
+            if (typeof message.name === "string")
+              this.doc.players[team].name =
+                message.name
+                  .trim()
+                  .replace(/[\x00-\x1f\x7f]/g, "")
+                  .slice(0, 32) ||
+                (team === "blue" ? "اللاعب الأول" : "اللاعب الثاني");
             clearTimeout(timeout);
             this.doc.players[team].disconnectedAt = 0;
             this.sync();
@@ -368,10 +405,51 @@ export class ArenaRoom {
               this.doc.players.red?.ready &&
               this.online("blue") &&
               this.online("red")
-            )
+            ) {
+              if (!this.doc.started)
+                this.doc.countdownUntil = Date.now() + 3000;
               this.doc.started = true;
+            }
             this.ctx.waitUntil(this.save());
             this.sync();
+          } else if (message.type === "surrender") {
+            if (this.doc.started && this.core.battle.status === "playing") {
+              this.core.battle.status = peer.team === "blue" ? "lost" : "won";
+              this.core.battle.message = "انتهت المواجهة باستسلام الخصم";
+              this.core.battle.emit(
+                peer.team === "blue" ? "defeat" : "victory",
+              );
+              this.ctx.waitUntil(this.save());
+              this.sync();
+            }
+          } else if (message.type === "rematch") {
+            if (this.core.battle.status !== "playing") {
+              this.doc.players[peer.team].rematch = true;
+              if (
+                this.doc.players.blue?.rematch &&
+                this.doc.players.red?.rematch &&
+                this.online("blue") &&
+                this.online("red")
+              ) {
+                const previous = this.core.battle;
+                this.core = new RoomCore(
+                  this.doc.rules || {
+                    stage: previous.stageIndex,
+                    map: previous.map.id,
+                    startingCash: previous.startingCash,
+                  },
+                );
+                this.doc.match = (this.doc.match || 1) + 1;
+                this.doc.started = true;
+                this.doc.countdownUntil = Date.now() + 3000;
+                for (const player of Object.values(this.doc.players)) {
+                  player.rematch = false;
+                  player.ready = true;
+                }
+              }
+              this.ctx.waitUntil(this.save());
+              this.sync();
+            }
           } else if (message.type === "action") {
             try {
               const result = this.core.act(peer.team, message.action);

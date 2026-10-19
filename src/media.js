@@ -1,8 +1,10 @@
-export function setupMedia(content) {
-  content.innerHTML = `<div class="media-app"><header><h2>عارض الصور والوسائط وPDF</h2><label class="media-picker">اختر ملفًا من جهازك<input type="file" accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,audio/*,video/*" aria-label="فتح صورة أو ملف وسائط أو PDF"></label><p>تُعرض الملفات محليًا دون رفعها. يبقى الملف مفتوحًا حتى إغلاق النافذة؛ تُحفظ ملفاتك الأصلية على جهازك.</p></header><nav class="media-tools"><button data-media="zoom-in">تكبير الصورة</button><button data-media="zoom-out">تصغير الصورة</button><button data-media="rotate">تدوير الصورة</button><button data-media="fit">ملاءمة</button><a class="media-open hidden" target="_blank" rel="noopener noreferrer">فتح الملف في تبويب مستقل</a></nav><section class="media-stage"><p>صور · PDF · صوت · فيديو</p></section><p class="media-status" role="status"></p></div>`;
+import { saveMedia, readMedia, mediaFile } from "./media-store.js";
+export function setupMedia(content, { target = null } = {}) {
+  content.innerHTML = `<div class="media-app"><header><h2>عارض الصور والوسائط وPDF</h2><label class="media-picker">اختر ملفًا من جهازك<input type="file" accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,audio/*,video/*" aria-label="فتح صورة أو ملف وسائط أو PDF"></label><p>تُعرض الملفات محليًا دون رفعها. احفظ نسخة في «ملفاتي» لفتحها لاحقًا؛ حد الملف المحفوظ 12 ميغابايت والمكتبة 18 ميغابايت.</p></header><button data-save-media disabled>حفظ نسخة في ملفاتي</button><nav class="media-tools"><button data-media="zoom-in">تكبير الصورة</button><button data-media="zoom-out">تصغير الصورة</button><button data-media="rotate">تدوير الصورة</button><button data-media="fit">ملاءمة</button><a class="media-open hidden" target="_blank" rel="noopener noreferrer">فتح الملف في تبويب مستقل</a></nav><section class="media-stage"><p>صور · PDF · صوت · فيديو</p></section><p class="media-status" role="status"></p></div>`;
   const stage = content.querySelector(".media-stage"),
     status = content.querySelector(".media-status"),
     link = content.querySelector(".media-open");
+  let currentFile = null;
   let url = null,
     closed = false,
     rotation = 0,
@@ -27,8 +29,7 @@ export function setupMedia(content) {
     for (const b of content.querySelectorAll("[data-media]"))
       b.disabled = kind !== "image";
   }
-  content.querySelector("[type=file]").onchange = async (event) => {
-    const file = event.target.files[0];
+  async function showFile(file) {
     if (!file) return;
     const request = ++revision;
     try {
@@ -52,6 +53,8 @@ export function setupMedia(content) {
           "اختر صورة PNG/JPG/WebP/GIF أو PDF أو صوتًا أو فيديو مدعومًا",
         );
       release();
+      currentFile = file;
+      content.querySelector("[data-save-media]").disabled = false;
       url = URL.createObjectURL(
         new Blob([file], {
           type: kind === "pdf" ? "application/pdf" : file.type,
@@ -97,10 +100,33 @@ export function setupMedia(content) {
       controls();
     } catch (error) {
       status.textContent = error.message;
-    } finally {
-      event.target.value = "";
+    }
+  }
+  content.querySelector("[type=file]").onchange = async (event) => {
+    await showFile(event.target.files[0]);
+    event.target.value = "";
+  };
+  content.querySelector("[data-save-media]").onclick = async () => {
+    if (!currentFile) return;
+    try {
+      await saveMedia(currentFile);
+      status.textContent =
+        "حُفظ الملف في ملفاتي ويظل متاحًا بعد إعادة فتح MyOS ✓";
+    } catch (error) {
+      status.textContent = error.message;
     }
   };
+  async function openSaved(event) {
+    try {
+      const record = await readMedia(event.detail.id);
+      if (!closed && record && !record.deleted)
+        await showFile(mediaFile(record));
+    } catch (error) {
+      status.textContent = error.message;
+    }
+  }
+  content.addEventListener("myos:open-item", openSaved);
+  if (target) openSaved({ detail: target });
   for (const b of content.querySelectorAll("[data-media]"))
     b.onclick = () => {
       if (b.dataset.media === "rotate") rotation = (rotation + 90) % 360;
@@ -117,6 +143,7 @@ export function setupMedia(content) {
   controls();
   return () => {
     closed = true;
+    content.removeEventListener("myos:open-item", openSaved);
     revision++;
     release();
   };

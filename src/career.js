@@ -22,14 +22,15 @@ export const OPERATIONS = [
     mission: "assault",
     title: "درع الطريق",
     story:
-      "أصبح الطريق آمنًا. فكك قيادة الهجوم الأرضي قبل انتقال الحملة إلى الجو.",
+      "استخدم الدبابات والمشاة والمدفعية لفك قيادة الهجوم الأرضي؛ تُضاف الطائرات في العملية التالية.",
   },
   {
     id: "clear-skies",
     stage: 1,
     mission: "intercept",
     title: "سماء مفتوحة",
-    story: "تعترض غارة طريق الأسطول. أسقط الطائرات قبل انتهاء نافذة الاعتراض.",
+    story:
+      "انضمت الطائرات إلى الدبابات. احمِ قاعدتك الأرضية واعترض الغارة قبل انتهاء الوقت.",
   },
   {
     id: "silent-wing",
@@ -45,39 +46,47 @@ export const OPERATIONS = [
     mission: "capture",
     title: "بوابة البحر",
     story:
-      "سيطر على الميناء لتأمين الإمداد البحري، وامنع السفن المعادية من الاقتراب.",
+      "انضمت السفن والغواصات إلى البر والطيران. قد القوات الأربع في الساحل نفسه لتأمين الميناء.",
   },
   {
     id: "deep-watch",
-    stage: 3,
+    stage: 2,
+    map: "archipelago",
+    legacy: { stage: 3, mission: "survive" },
     mission: "survive",
     title: "الحارس الصامت",
-    story: "حركة غواصات قرب المحطة. احمِ أجهزة الاتصال حتى يكتمل الإرسال.",
+    story:
+      "احمِ القيادة الساحلية 150 ثانية، بالدبابات والطيران والمدمرات والغواصات في المعركة نفسها.",
   },
   {
     id: "horizon",
-    stage: 3,
+    stage: 2,
+    map: "strait",
+    legacy: { stage: 3, mission: "assault" },
     mission: "assault",
     title: "أفق الأعماق",
-    story: "وصلت إحداثيات القيادة المغمورة. حيّدها لفتح طريق الاستطلاع الأخير.",
+    story:
+      "استعمل الغواصات لحماية الأسطول، والطيران والدبابات لتدمير القيادة الساحلية.",
   },
   {
     id: "small-eye",
-    stage: 1,
-    map: "watchtower",
+    stage: 2,
+    map: "archipelago",
+    legacy: { stage: 1, mission: "recon" },
     mission: "recon",
     title: "عين فوق الحدود",
     story:
-      "اختر منطقة المراقبة شرق الخريطة. أبقِ طائرة الاستطلاع قرب الدائرة عشر ثوانٍ مع تجنب الدفاعات.",
+      "في الأرخبيل المشترك، اكشف منطقة شرق البحر عشر ثوانٍ بطائرة الاستطلاع مع حماية البر والأسطول.",
   },
   {
     id: "long-horizon",
-    stage: 0,
-    map: "fireline",
+    stage: 2,
+    map: "strait",
+    legacy: { stage: 0, mission: "siege" },
     mission: "siege",
     title: "مدى الأفق",
     story:
-      "انقل المشاة بالناقلات لحماية المدفعية. اكشف قيادة الخصم جوًا ثم اقصفها من خارج مدى دفاعاتها.",
+      "الهجوم الختامي المشترك: انقل المشاة على الشاطئ، اكشف جوًا، واحمِ مدفعيتك بالسفن والغواصات.",
   },
 ];
 export const UPGRADE_NAMES = {
@@ -96,6 +105,8 @@ export function parseCareer(raw) {
         d.reports.some(
           (r) =>
             !r ||
+            (r.stars !== undefined &&
+              (!Number.isInteger(r.stars) || r.stars < 1 || r.stars > 3)) ||
             !OPERATIONS.some((o) => o.id === r.id) ||
             ["time", "kills", "losses", "shots", "damage"].some(
               (k) => !Number.isFinite(r[k]) || r[k] < 0 || r[k] > 1e9,
@@ -150,7 +161,12 @@ export function awardOperation(career, battle) {
   career.points++;
   career.xp += 100 + Math.max(0, Math.round(200 - battle.time / 2));
   career.reports = [
-    { id: op.id, time: Math.round(battle.time), ...battle.stats },
+    {
+      id: op.id,
+      time: Math.round(battle.time),
+      ...battle.stats,
+      stars: operationStars(battle),
+    },
     ...(career.reports || []),
   ].slice(0, OPERATIONS.length);
   return true;
@@ -165,4 +181,75 @@ export function buyUpgrade(career, key) {
   career.points--;
   career.upgrades[key]++;
   return true;
+}
+
+export const SECONDARY_GOALS = {
+  "first-light": [
+    "احتفظ بمركز القيادة عند 70% من صحته",
+    (b) =>
+      b.entities.some(
+        (e) => e.team === "blue" && e.type === "hq" && e.hp / e.maxHp >= 0.7,
+      ),
+  ],
+  "safe-return": [
+    "أنشئ مركزي إمداد",
+    (b) =>
+      b.entities.filter((e) => e.team === "blue" && e.type === "supply")
+        .length >= 2,
+  ],
+  "sand-shield": ["أنهِ المعركة خلال 8 دقائق", (b) => b.time <= 480],
+  "clear-skies": [
+    "أبقِ مقاتلتين في الخدمة",
+    (b) =>
+      b.entities.filter((e) => e.team === "blue" && e.type === "fighter")
+        .length >= 2,
+  ],
+  "silent-wing": [
+    "أبقِ قاذفة في الخدمة",
+    (b) => b.entities.some((e) => e.team === "blue" && e.type === "bomber"),
+  ],
+  "harbor-watch": [
+    "احتفظ بثلاث وحدات بحرية",
+    (b) =>
+      b.entities.filter(
+        (e) =>
+          e.team === "blue" && ["sea", "sub"].includes(e.domain) && e.speed,
+      ).length >= 3,
+  ],
+  "deep-watch": [
+    "احتفظ بغواصتين",
+    (b) =>
+      b.entities.filter((e) => e.team === "blue" && e.type === "submarine")
+        .length >= 2,
+  ],
+  horizon: ["دمّر 8 أهداف", (b) => b.stats.kills >= 8],
+  "small-eye": [
+    "أبقِ طائرة الاستطلاع سالمة",
+    (b) =>
+      b.entities.some(
+        (e) => e.team === "blue" && e.type === "recon" && e.hp / e.maxHp >= 0.7,
+      ),
+  ],
+  "long-horizon": [
+    "أبقِ مدفعية وناقلة في الخدمة",
+    (b) =>
+      ["artillery", "apc"].every((type) =>
+        b.entities.some((e) => e.team === "blue" && e.type === type),
+      ),
+  ],
+};
+export function secondaryGoal(battle) {
+  const goal = SECONDARY_GOALS[battle.operationId];
+  return goal
+    ? { text: goal[0], met: goal[1](battle) }
+    : { text: "أنهِ المعركة خلال 8 دقائق", met: battle.time <= 480 };
+}
+export function operationStars(battle) {
+  return battle.status === "won"
+    ? 1 + Number(secondaryGoal(battle).met) + Number(battle.stats.losses <= 3)
+    : 0;
+}
+export function unlockedEquipment(career) {
+  const stars = (career.reports || []).reduce((n, r) => n + (r.stars || 1), 0);
+  return { reinforced: stars >= 2, precision: stars >= 5, veteran: stars >= 8 };
 }

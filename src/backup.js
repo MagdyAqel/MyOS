@@ -1,3 +1,4 @@
+import { listMedia, replaceMedia } from "./media-store.js";
 import {
   collectBackup,
   validateBackup,
@@ -31,9 +32,27 @@ async function decodeImage(wall) {
   }
   return blob;
 }
+function decodeMedia(records) {
+  return records.map(({ base64, ...record }) => ({
+    ...record,
+    blob: new Blob([Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))], {
+      type: record.type,
+    }),
+  }));
+}
 const capture = async () => {
   window.dispatchEvent(new Event("myos:flush-data"));
-  return collectBackup(localStorage, await encodeImage(await readWallpaper()));
+  const data = collectBackup(
+    localStorage,
+    await encodeImage(await readWallpaper()),
+  );
+  data.media = await Promise.all(
+    (await listMedia()).map(async ({ blob, ...record }) => ({
+      ...record,
+      ...(await encodeImage(blob)),
+    })),
+  );
+  return validateBackup(data);
 };
 function download(snapshot, name) {
   const url = URL.createObjectURL(
@@ -46,7 +65,7 @@ function download(snapshot, name) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 export function setupBackup(content) {
-  content.innerHTML = `<div class="cloud-page backup-page"><span class="eyebrow">MYOS · LOCAL BACKUP</span><h2>بياناتك في ملف واحد</h2><p>الملاحظات والملفات والمستندات وحفظ المعارك والحملة والتفضيلات والخلفية الشخصية. يمكنك نقلها إلى جهاز آخر دون حساب أو خدمة سحابية. لا تُضمّن جلسات الدخول أو كلمات المرور أو إعداد ربط السحابة، ولا الملفات التي فتحتها مؤقتًا في عارض الوسائط.</p><button data-backup="export">تنزيل نسخة احتياطية كاملة</button><label>اختر نسخة للاستعادة<input type="file" accept="application/json,.json" aria-label="اختيار نسخة احتياطية"></label><p class="backup-summary"></p><section class="backup-review hidden"><p>ستستبدل بيانات هذا المتصفح ببيانات النسخة، وتُغلق التطبيقات الأخرى. نزّل النسخة الحالية أولًا إذا أردت الاحتفاظ بها.</p><button data-backup="confirm">تأكيد استعادة النسخة</button><button data-backup="cancel">إلغاء</button></section><button data-backup="undo" disabled>تراجع عن الاستعادة في هذه الجلسة</button><button data-backup="reload" class="hidden">إعادة فتح MyOS لتطبيق التفضيلات</button><p class="backup-status" role="status">ملفات النسخ تحتوي بياناتك؛ احتفظ بها في مكان خاص بك.</p></div>`;
+  content.innerHTML = `<div class="cloud-page backup-page"><span class="eyebrow">MYOS · LOCAL BACKUP</span><h2>بياناتك في ملف واحد</h2><p>الملاحظات والملفات والمستندات والوسائط المحفوظة في ملفاتي وحفظ المعارك والحملة والتفضيلات والخلفية الشخصية. يمكنك نقلها إلى جهاز آخر دون حساب أو خدمة سحابية. لا تُضمّن جلسات الدخول أو كلمات المرور أو إعداد ربط السحابة، ولا الملفات التي فتحتها مؤقتًا في عارض الوسائط.</p><button data-backup="export">تنزيل نسخة احتياطية كاملة</button><label>اختر نسخة للاستعادة<input type="file" accept="application/json,.json" aria-label="اختيار نسخة احتياطية"></label><p class="backup-summary"></p><section class="backup-review hidden"><p>ستستبدل بيانات هذا المتصفح ببيانات النسخة، وتُغلق التطبيقات الأخرى. نزّل النسخة الحالية أولًا إذا أردت الاحتفاظ بها.</p><button data-backup="confirm">تأكيد استعادة النسخة</button><button data-backup="cancel">إلغاء</button></section><button data-backup="undo" disabled>تراجع عن الاستعادة في هذه الجلسة</button><button data-backup="reload" class="hidden">إعادة فتح MyOS لتطبيق التفضيلات</button><p class="backup-status" role="status">ملفات النسخ تحتوي بياناتك؛ احتفظ بها في مكان خاص بك.</p></div>`;
   const status = content.querySelector(".backup-status"),
     review = content.querySelector(".backup-review"),
     input = content.querySelector("[type=file]");
@@ -92,7 +111,7 @@ export function setupBackup(content) {
       pending = data;
       const n = backupSummary(data);
       content.querySelector(".backup-summary").textContent =
-        `معاينة: ${n.notes} ملاحظات · ${n.files} عناصر ملفات · ${n.documents} مستندات · ${n.battles} حفظ معارك · ${n.operations} عمليات حملة · ${data.wallpaper ? "مع خلفية شخصية" : "خلفية مرفقة غير موجودة"}`;
+        `معاينة: ${n.notes} ملاحظات · ${n.files} عناصر ملفات · ${n.documents} مستندات · ${n.media} وسائط محفوظة · ${n.battles} حفظ معارك · ${n.operations} عمليات حملة · ${data.wallpaper ? "مع خلفية شخصية" : "خلفية مرفقة غير موجودة"}`;
       review.classList.remove("hidden");
       tell("النسخة صالحة. راجع التفاصيل ثم أكد الاستعادة.");
     } catch (error) {
@@ -109,11 +128,13 @@ export function setupBackup(content) {
     window.dispatchEvent(new Event("myos:before-data-restore"));
     previous = await capture();
     try {
+      if (data.media !== undefined) await replaceMedia(decodeMedia(data.media));
       await writeWallpaper(blob);
       writeBackupDatasets(localStorage, data.datasets);
       window.dispatchEvent(new Event("myos:preferences-restored"));
     } catch (error) {
       try {
+        await replaceMedia(decodeMedia(previous.media || []));
         await writeWallpaper(await decodeImage(previous.wallpaper));
         writeBackupDatasets(localStorage, previous.datasets);
         window.dispatchEvent(new Event("myos:preferences-restored"));

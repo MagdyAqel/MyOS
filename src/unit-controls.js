@@ -1,8 +1,9 @@
+import { advancedOrder } from "./battle-expansion.js";
 import { APC_DESIGNS, specialAction } from "./unit-abilities.js";
 export function setupUnitControls(content, { getBattle, arm, refresh }) {
   const panel = document.createElement("section");
   panel.className = "unit-abilities";
-  panel.innerHTML = `<h3>النقل والاستطلاع</h3><label>تجهيز الناقلة الجديدة<select aria-label="تصميم ناقلة الجند">${Object.entries(
+  panel.innerHTML = `<h3>أوامر الوحدات المحددة</h3><p class="selection-detail"></p><div class="selection-actions"><button data-advanced="hold">تثبيت الموقع</button><button data-advanced="retreat">انسحاب وصيانة</button><label>أولوية الهدف<select aria-label="أولوية الهدف"><option value="nearest">الأقرب</option><option value="air">الطائرات</option><option value="armor">المدرعات والسفن</option></select></label></div><label>تجهيز الناقلة الجديدة<select aria-label="تصميم ناقلة الجند">${Object.entries(
     APC_DESIGNS,
   )
     .map(([id, d]) => `<option value="${id}">${d.name}</option>`)
@@ -76,6 +77,15 @@ export function setupUnitControls(content, { getBattle, arm, refresh }) {
       .setAttribute("aria-expanded", "false");
     refresh();
   };
+  for (const button of panel.querySelectorAll("[data-advanced]"))
+    button.onclick = () => {
+      advancedOrder(getBattle(), { kind: button.dataset.advanced });
+      refresh();
+    };
+  panel.querySelector('[aria-label="أولوية الهدف"]').onchange = (event) => {
+    advancedOrder(getBattle(), { kind: "priority", value: event.target.value });
+    refresh();
+  };
   let roster = "";
   return {
     design: () => design.value,
@@ -84,6 +94,29 @@ export function setupUnitControls(content, { getBattle, arm, refresh }) {
       if (!b) return;
       designLabel.classList.toggle("hidden", !b.allowed("apc"));
       designNote.classList.toggle("hidden", !b.allowed("apc"));
+      const selected = b.entities.filter(
+        (e) => b.selected.has(e.id) && !e.carriedBy,
+      );
+      panel.querySelector(".selection-detail").textContent = selected.length
+        ? selected
+            .map(
+              (e) =>
+                `${e.name} #${e.id} · صحة ${Math.ceil(e.hp)}/${e.maxHp}${e.maxAmmo ? ` · ذخيرة ${Math.floor(e.ammo)}/${e.maxAmmo}` : ""}${e.range ? ` · مدى ${e.minRange || 0}–${e.range}` : ""}`,
+            )
+            .join(" | ")
+        : "حدد وحدة لعرض حالتها وأوامرها";
+      panel.querySelector(".selection-actions").hidden = !selected.length;
+      const transport =
+        selected.some((e) => ["soldier", "apc"].includes(e.type)) ||
+        b.entities.some((e) => e.team === "blue" && e.carriedBy);
+      carrier.closest("label").hidden = !transport;
+      panel.querySelector(".command-pair").hidden = !transport;
+      panel.querySelector("[data-ability=recon]").hidden = !selected.some(
+        (e) => e.type === "recon",
+      );
+      const priorities = new Set(selected.map((e) => e.priority || "nearest"));
+      panel.querySelector('[aria-label="أولوية الهدف"]').value =
+        priorities.size === 1 ? [...priorities][0] : "nearest";
       const apcs = b.entities.filter(
         (e) => e.team === "blue" && e.type === "apc",
       );

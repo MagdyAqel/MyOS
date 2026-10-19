@@ -9,7 +9,17 @@ export const STAGES = [
     interval: 40,
     description: "أنشئ خطوط الإمداد، درّب المدرعات ودمّر مقر العدو في الصحراء.",
     buildings: ["supply", "power", "barracks", "factory", "airfield", "turret"],
-    units: ["soldier", "tank", "apc", "artillery", "recon", "drone"],
+    units: [
+      "soldier",
+      "tank",
+      "apc",
+      "artillery",
+      "recon",
+      "drone",
+      "engineer",
+      "repair",
+      "ammoTruck",
+    ],
     enemies: ["soldier", "soldier", "tank"],
   },
   {
@@ -23,22 +33,56 @@ export const STAGES = [
     description:
       "قد مقاتلاتك وقاذفاتك فوق الهضاب؛ احمِ القاعدة من الغارات ودمّر قيادة العدو.",
     buildings: ["supply", "power", "airfield", "barracks", "factory", "turret"],
-    units: ["fighter", "bomber", "recon", "drone", "soldier", "apc", "artillery"],
+    units: [
+      "fighter",
+      "bomber",
+      "recon",
+      "drone",
+      "soldier",
+      "tank",
+      "apc",
+      "artillery",
+      "engineer",
+      "repair",
+      "ammoTruck",
+    ],
     enemies: ["fighter", "fighter", "bomber"],
   },
   {
     id: "sea",
-    name: "حارس المضيق",
-    category: "مهمة بحرية",
+    name: "جبهة القوات المشتركة",
+    category: "بر · طيران · بحر · غواصات",
     terrain: "coast",
     cash: 3800,
     waves: 4,
     interval: 48,
     description:
-      "أنشئ مبانيك على الساحل (أعلى الخريطة) والميناء عند الشاطئ، ثم أرسل السفن لمهاجمة مقر العدو.",
-    buildings: ["supply", "power", "harbor", "airfield", "turret"],
-    units: ["destroyer", "submarine", "fighter", "recon", "drone"],
-    enemies: ["destroyer", "submarine", "destroyer"],
+      "قد الدبابات على الشاطئ، والطائرات فوق الساحل، والسفن والغواصات في البحر ضمن ساحة واحدة.",
+    buildings: [
+      "supply",
+      "power",
+      "barracks",
+      "factory",
+      "harbor",
+      "airfield",
+      "turret",
+    ],
+    units: [
+      "soldier",
+      "tank",
+      "apc",
+      "artillery",
+      "engineer",
+      "repair",
+      "ammoTruck",
+      "fighter",
+      "bomber",
+      "recon",
+      "drone",
+      "destroyer",
+      "submarine",
+    ],
+    enemies: ["tank", "fighter", "destroyer", "submarine", "bomber"],
   },
   {
     id: "abyss",
@@ -75,3 +119,26 @@ export function loadCampaign(storage) {
     return { stage: 0, completed: [] };
   }
 }
+
+export const FORCE_PHASES = {
+  armor: { name: "المرحلة الأولى · المدرعات والمشاة", domains: ["ground"] },
+  air: { name: "المرحلة الثانية · البر والطيران", domains: ["ground", "air"] },
+  joint: {
+    name: "المرحلة الثالثة · قوات مشتركة",
+    domains: ["ground", "air", "sea", "sub"],
+  },
+};
+export const OPERATION_PHASES = Object.fromEntries(
+  [
+    "first-light",
+    "safe-return",
+    "sand-shield",
+    "clear-skies",
+    "silent-wing",
+    "harbor-watch",
+    "deep-watch",
+    "horizon",
+    "small-eye",
+    "long-horizon",
+  ].map((id, i) => [id, i < 3 ? "armor" : i < 5 ? "air" : "joint"]),
+);

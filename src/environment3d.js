@@ -102,7 +102,13 @@ export function enhanceEnvironment(scene, terrain, stage, map) {
     terrain.add(sea);
     extras.push(waterMaterial);
   }
-  const particles = [];
+  const particles = [],
+    wrecks = [];
+  const wreckGeometry = new THREE.BoxGeometry(1, 1, 1),
+    wreckMaterial = new THREE.MeshStandardMaterial({
+      color: "#343434",
+      roughness: 1,
+    });
   const smokeCanvas = document.createElement("canvas");
   smokeCanvas.width = smokeCanvas.height = 64;
   const ctx = smokeCanvas.getContext("2d"),
@@ -142,6 +148,28 @@ export function enhanceEnvironment(scene, terrain, stage, map) {
   function events(events) {
     for (const e of events) {
       if (e.kind === "explosion") {
+        if (
+          e.type &&
+          e.domain !== "air" &&
+          e.domain !== "sub" &&
+          !["soldier", "survivor", "engineer"].includes(e.type)
+        ) {
+          const wreck = new THREE.Mesh(wreckGeometry, wreckMaterial);
+          wreck.position.set(
+            e.x - 500,
+            stage.terrain === "abyss" ? -17 : 3,
+            e.y - 310,
+          );
+          wreck.scale.set(
+            e.size * 1.6,
+            Math.max(4, e.size * 0.3),
+            e.size * 1.4,
+          );
+          wreck.rotation.set(0.08, e.heading || 0, 0.12);
+          scene.add(wreck);
+          wrecks.push({ mesh: wreck, life: 35 });
+          if (wrecks.length > 24) scene.remove(wrecks.shift().mesh);
+        }
         spawn(
           e.x - 500,
           level(e.domain),
@@ -190,6 +218,25 @@ export function enhanceEnvironment(scene, terrain, stage, map) {
   function animate(battle) {
     const dt = Math.min(0.1, Math.max(0, battle.time - last));
     last = battle.time;
+    for (let i = wrecks.length - 1; i >= 0; i--) {
+      const w = wrecks[i];
+      w.life -= dt;
+      w.mesh.visible =
+        !battle.fog ||
+        battle.entities.some(
+          (e) =>
+            e.team === "blue" &&
+            !e.carriedBy &&
+            Math.hypot(
+              e.x - (w.mesh.position.x + 500),
+              e.y - (w.mesh.position.z + 310),
+            ) < 200,
+        );
+      if (w.life <= 0) {
+        scene.remove(w.mesh);
+        wrecks.splice(i, 1);
+      }
+    }
     if (sea) {
       const p = sea.geometry.attributes.position;
       for (let i = 0; i < p.count; i++)
@@ -238,6 +285,9 @@ export function enhanceEnvironment(scene, terrain, stage, map) {
     events,
     animate,
     dispose() {
+      for (const wreck of wrecks) scene.remove(wreck.mesh);
+      wreckGeometry.dispose();
+      wreckMaterial.dispose();
       for (const p of particles) {
         scene.remove(p.sprite);
         p.sprite.material.dispose();

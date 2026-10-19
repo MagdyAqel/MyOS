@@ -1,3 +1,4 @@
+import {setupGlobalSearch} from "./global-search.js";
 import {setupAppearance,setupDesktopExtras} from "./desktop-extras.js";
 import "./productivity.css";
 import './style.css';
@@ -65,9 +66,9 @@ function setTheme(theme){document.documentElement.dataset.theme=theme;save('myos
 setTheme(read('myos-theme','dark'));
 document.querySelector('#theme-quick').onclick=()=>setTheme(document.documentElement.dataset.theme==='light'?'dark':'light');
 
-function openApp(id,matchConnection=null){
+function openApp(id,matchConnection=null,openTarget=null){
   toggleStart(false);document.querySelector('#quick').classList.add('hidden');
-  if(windows.has(id)){const w=windows.get(id);w.classList.remove('hidden');w.style.zIndex=++z;return;}
+  if(windows.has(id)){const w=windows.get(id);w.classList.remove('hidden');w.style.zIndex=++z;if(openTarget){const content=w.querySelector('.window-content');if(content.dataset.appReady==='true')content.dispatchEvent(new CustomEvent('myos:open-item',{detail:openTarget}));else content.pendingTarget=openTarget;}return;}
   const app=apps.find(a=>a.id===id);if(!app)return;
   const w=document.createElement('section');w.className='window glass';w.setAttribute('aria-label',app.name);w.style.zIndex=++z;
   if(id==='strategy')w.classList.add('game-window','maximized');
@@ -82,7 +83,7 @@ function openApp(id,matchConnection=null){
   const bar=w.querySelector('.titlebar');bar.ondblclick=e=>{if(!e.target.closest('button'))maximize();};
   bar.onpointerdown=e=>{if(e.target.closest('button')||w.classList.contains('maximized'))return;const rect=w.getBoundingClientRect();const dx=e.clientX-rect.left,dy=e.clientY-rect.top;bar.setPointerCapture(e.pointerId);bar.onpointermove=m=>{w.style.left=`${Math.max(0,Math.min(innerWidth-100,m.clientX-dx))}px`;w.style.top=`${Math.max(0,Math.min(innerHeight-100,m.clientY-dy))}px`;};bar.onpointerup=()=>bar.onpointermove=null;bar.onpointercancel=()=>bar.onpointermove=null;};
   const content=w.querySelector('.window-content');
-  if(id==='notes') w.cleanup=setupNotes(content);
+  if(id==='notes') w.cleanup=setupNotes(content,{target:openTarget});
   if(id==='browser') w.cleanup=setupBrowser(content);
   if(id==='strategy'){
     content.textContent='جارٍ تحميل العالم ثلاثي الأبعاد…';
@@ -90,13 +91,15 @@ function openApp(id,matchConnection=null){
   }
   if(id==='cloud'){content.textContent='جارٍ فتح المزامنة…';import('./cloud.js').then(({setupCloud})=>{if(w.isConnected)w.cleanup=setupCloud(content);}).catch(()=>{if(w.isConnected)content.textContent='تعذّر فتح المزامنة. أعد المحاولة.';});}
   if(id==='arena'){content.textContent='جارٍ فتح المواجهة…';import('./arena.js').then(({setupArena})=>{if(w.isConnected)w.cleanup=setupArena(content,{openGame:connection=>{windows.get('strategy')?.querySelector('[data-action=close]').click();openApp('strategy',connection);}});}).catch(()=>{if(w.isConnected)content.textContent='تعذّر فتح اللعب عبر الويب';});}
-  if(['writer','media','backup'].includes(id)){content.textContent='جارٍ فتح التطبيق…';const loaders={writer:()=>import('./documents.js').then(m=>m.setupWriter),media:()=>import('./media.js').then(m=>m.setupMedia),backup:()=>import('./backup.js').then(m=>m.setupBackup)};loaders[id]().then(setup=>{if(w.isConnected)w.cleanup=setup(content);}).catch(()=>{if(w.isConnected)content.textContent='تعذّر فتح التطبيق. أعد المحاولة.';});}
+  if(['writer','media','backup'].includes(id)){content.textContent='جارٍ فتح التطبيق…';const loaders={writer:()=>import('./documents.js').then(m=>m.setupWriter),media:()=>import('./media.js').then(m=>m.setupMedia),backup:()=>import('./backup.js').then(m=>m.setupBackup)};loaders[id]().then(setup=>{if(w.isConnected){w.cleanup=setup(content,{target:content.pendingTarget||openTarget});content.dataset.appReady='true';}}).catch(()=>{if(w.isConnected)content.textContent='تعذّر فتح التطبيق. أعد المحاولة.';});}
   if(id==='install')w.cleanup=setupInstall(content);
   if(id==='calculator') setupCalculator(content);
-  if(id==='files') w.cleanup=setupFiles(content);
+  if(id==='files') w.cleanup=setupFiles(content,{target:openTarget,openMedia:item=>openApp('media',null,item)});
   if(id==='settings'){w.cleanup=setupPersonalization(content,wallpaperManager,setTheme);setupAppearance(content);}
-  if(id==='about')content.innerHTML='<div class="about-page"><span class="about-mark">◈</span><h2>MyOS</h2><p>سطح مكتب صغير. احتمالات كبيرة.</p><p class="muted">محاكاة تفاعلية مستوحاة من ويندوز 11 تعمل داخل المتصفح.<br>ليست نظام تشغيل حقيقيًا، ولا تشغّل برامج Windows.</p><span class="version">الإصدار 4.1.1 · Develped by:Pro. Magdy S. Aqel</span></div>';
+  if(['files','notes'].includes(id))content.dataset.appReady='true';
+  if(id==='about')content.innerHTML='<div class="about-page"><span class="about-mark">◈</span><h2>MyOS</h2><p>سطح مكتب صغير. احتمالات كبيرة.</p><p class="muted">محاكاة تفاعلية مستوحاة من ويندوز 11 تعمل داخل المتصفح.<br>ليست نظام تشغيل حقيقيًا، ولا تشغّل برامج Windows.</p><span class="version">الإصدار 4.2.0 · Develped by:Pro. Magdy S. Aqel</span></div>';
 }
+setupGlobalSearch(item=>openApp(item.app,null,item));
 const wallpaperManager=createWallpaperManager();
 function setupCalculator(content){
   content.innerHTML='<div class="calculator"><span class="muted">قياسية</span><output aria-label="نتيجة الحاسبة">0</output><div class="calc-keys"></div></div>';

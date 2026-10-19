@@ -69,6 +69,11 @@ export class MatchConnection extends EventTarget {
     this.controls = { formation: "spread", commandMode: "move", groups: {} };
     this.notice = "";
     this.retry = null;
+    this.latency = null;
+    this.pingTimer = setInterval(() => {
+      if (this.socket?.readyState === WebSocket.OPEN)
+        this.send({ type: "ping", at: Date.now() });
+    }, 3000);
     this.connect();
   }
   emit(type) {
@@ -93,7 +98,11 @@ export class MatchConnection extends EventTarget {
     this.emit("status");
     this.socket.onopen = () =>
       this.socket.send(
-        JSON.stringify({ type: "auth", token: this.session.token }),
+        JSON.stringify({
+          type: "auth",
+          token: this.session.token,
+          name: this.session.name,
+        }),
       );
     this.socket.onmessage = (event) => {
       try {
@@ -111,11 +120,15 @@ export class MatchConnection extends EventTarget {
             {
               waiting: "بانتظار اتصال اللاعب الآخر وجاهزية الطرفين",
               playing: "متصل · المواجهة جارية",
+              countdown: `تبدأ المواجهة خلال ${data.countdown}…`,
               paused:
                 "انقطع اتصال الخصم؛ المعركة متوقفة حتى عودته (مهلة 60 ثانية)",
               ended: "انتهت المواجهة",
             }[data.phase] || "حالة غير معروفة";
           this.emit("state");
+          this.emit("status");
+        } else if (data.type === "pong" && Number.isFinite(data.at)) {
+          this.latency = Math.max(0, Date.now() - data.at);
           this.emit("status");
         } else if (data.type === "ack") {
           this.notice = data.text;
@@ -184,6 +197,7 @@ export class MatchConnection extends EventTarget {
   close() {
     this.closed = true;
     clearTimeout(this.retry);
+    clearInterval(this.pingTimer);
     this.socket?.close(1000, "Left room");
     this.status = "أُغلق الاتصال";
     this.emit("status");

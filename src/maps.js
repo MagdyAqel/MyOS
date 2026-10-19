@@ -170,7 +170,7 @@ export function mapSvg(
     )
     .map(
       (e) =>
-        `<circle cx="${e.x}" cy="${e.y}" r="110" fill="none" stroke="#81e7cd" stroke-width="4"/>`,
+        `<circle cx="${e.x}" cy="${e.y}" r="${e.vision || 110}" fill="none" stroke="#81e7cd" stroke-width="4"/>`,
     )
     .join(
       "",

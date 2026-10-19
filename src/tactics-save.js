@@ -3,6 +3,21 @@ import { OPERATIONS } from "./career.js";
 const finite = (n, max = 1000) => Number.isFinite(n) && n >= 0 && n <= max;
 const point = (p) => p && finite(p.x) && finite(p.y, 620);
 export function checkTactics(data) {
+  if (
+    data.equipment &&
+    (typeof data.equipment !== "object" ||
+      ["reinforced", "precision", "veteran"].some(
+        (k) => typeof data.equipment[k] !== "boolean",
+      ))
+  )
+    throw Error("تجهيزات غير صالحة");
+  if (
+    data.startingCash !== undefined &&
+    (!Number.isInteger(data.startingCash) ||
+      data.startingCash < 1000 ||
+      data.startingCash > 100000)
+  )
+    throw Error("مال البداية غير صالح");
   if (data.enemy?.lastHQ && !point(data.enemy.lastHQ))
     throw Error("بيانات استطلاع غير صالحة");
   if (data.rally && !point(data.rally)) throw Error("نقطة تجمع غير صالحة");
@@ -19,13 +34,14 @@ export function checkTactics(data) {
   if (
     (data.formation && !Object.hasOwn(FORMATIONS, data.formation)) ||
     (data.commandMode &&
-      !["move", "patrol", "guard"].includes(data.commandMode)) ||
+      !["move", "attackMove", "patrol", "guard"].includes(data.commandMode)) ||
     (data.operationId &&
       !OPERATIONS.some(
         (o) =>
           o.id === data.operationId &&
-          o.stage === data.stage &&
-          o.mission === data.mission,
+          ((o.stage === data.stage && o.mission === data.mission) ||
+            (o.legacy?.stage === data.stage &&
+              o.legacy.mission === data.mission)),
       ))
   )
     throw Error("أوامر حملة غير صالحة");
@@ -52,6 +68,8 @@ export function checkTactics(data) {
 }
 export function snapshotTactics(b) {
   return {
+    equipment: b.equipment,
+    startingCash: b.startingCash,
     rally: b.rally,
     formation: b.formation,
     commandMode: b.commandMode,
@@ -63,6 +81,8 @@ export function snapshotTactics(b) {
 }
 export function snapshotUnitTactics(e) {
   return {
+    stance: e.stance,
+    priority: e.priority,
     velocity: e.velocity,
     hqMode: e.hqMode,
     hqTimer: e.hqTimer,
@@ -74,6 +94,15 @@ export function snapshotUnitTactics(e) {
   };
 }
 export function restoreUnitTactics(e, saved) {
+  for (const [key, allowed] of [
+    ["stance", ["normal", "hold", "attackMove", "retreat"]],
+    ["priority", ["nearest", "air", "armor"]],
+  ]) {
+    if (saved[key] !== undefined) {
+      if (!allowed.includes(saved[key])) throw Error("أمر وحدة غير صالح");
+      e[key] = saved[key];
+    }
+  }
   if (saved.velocity !== undefined) {
     if (!finite(saved.velocity, 120)) throw Error("سرعة غير صالحة");
     e.velocity = saved.velocity;
@@ -120,6 +149,7 @@ export function restoreUnitTactics(e, saved) {
   }
 }
 export function restoreTactics(b, data) {
+  b.startingCash = data.startingCash || b.stage.cash;
   b.rally = data.rally ? { x: data.rally.x, y: data.rally.y } : null;
   b.upgrades = normalizeUpgrades(data.upgrades);
   b.formation = data.formation || "spread";

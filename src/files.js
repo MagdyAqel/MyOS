@@ -1,3 +1,4 @@
+import { listMedia, saveMedia, changeMedia } from "./media-store.js";
 import {
   FILES_KEY,
   loadFiles,
@@ -8,7 +9,10 @@ import {
   parseFiles,
 } from "./file-store.js";
 import "./files.css";
-export function setupFiles(content) {
+export function setupFiles(
+  content,
+  { openMedia = () => {}, target = null } = {},
+) {
   let storage;
   try {
     storage = localStorage;
@@ -20,12 +24,14 @@ export function setupFiles(content) {
       },
     };
   }
+  let mediaRecords = [],
+    closed = false;
   let data = loadFiles(storage),
     folder = "root",
     active = null,
     query = "",
     pending = null;
-  content.innerHTML = `<div class="files-app"><div class="files-toolbar"><button data-files="new-file">ملف جديد</button><button data-files="new-folder">مجلد جديد</button><label>استيراد نص<input type="file" accept=".txt,.md,.json,.csv,text/*,application/json" aria-label="استيراد ملف نصي"></label><input type="search" aria-label="البحث في الملفات" placeholder="البحث في الملفات"></div><form class="file-create hidden"><input aria-label="اسم العنصر الجديد" maxlength="120" required><button>إنشاء</button><button type="button" data-files="cancel">إلغاء</button></form><div class="file-layout"><aside><button data-folder="root">⌂ الرئيسية</button><button data-folder="documents">📁 المستندات</button><button data-folder="pictures">📁 الصور</button><button data-folder="downloads">📁 التنزيلات</button><button data-folder="trash">♻ سلة المحذوفات</button></aside><div class="file-main"><div class="file-path"></div><div class="file-items"></div><section class="file-editor hidden"><header><input aria-label="اسم الملف" maxlength="120"><button data-files="download">تنزيل الملف</button><button data-files="trash">نقل للسلة</button><button data-files="back">عودة للمجلد</button></header><textarea aria-label="محتوى الملف"></textarea></section><div class="trash-confirm hidden"><span>الحذف الدائم يزيل العنصر من هذا المتصفح. نزّل نسخة أولًا إن احتجتها.</span><button data-files="confirm-delete">تأكيد الحذف الدائم</button><button data-files="cancel-delete">إلغاء</button></div><div class="file-status" role="status"></div></div></div></div>`;
+  content.innerHTML = `<div class="files-app"><div class="files-toolbar"><button data-files="new-file">ملف جديد</button><button data-files="new-folder">مجلد جديد</button><label>استيراد ملف<input type="file" accept=".txt,.md,.json,.csv,text/*,application/json,image/png,image/jpeg,image/webp,image/gif,application/pdf,audio/*,video/*" aria-label="استيراد ملف نصي"></label><input type="search" aria-label="البحث في الملفات" placeholder="البحث في الملفات"></div><form class="file-create hidden"><input aria-label="اسم العنصر الجديد" maxlength="120" required><button>إنشاء</button><button type="button" data-files="cancel">إلغاء</button></form><div class="file-layout"><aside><button data-folder="root">⌂ الرئيسية</button><button data-folder="documents">📁 المستندات</button><button data-folder="pictures">📁 الصور</button><button data-folder="downloads">📁 التنزيلات</button><button data-folder="trash">♻ سلة المحذوفات</button></aside><div class="file-main"><div class="file-path"></div><div class="file-items"></div><div class="media-file-items"></div><section class="file-editor hidden"><header><input aria-label="اسم الملف" maxlength="120"><button data-files="download">تنزيل الملف</button><button data-files="trash">نقل للسلة</button><button data-files="back">عودة للمجلد</button></header><textarea aria-label="محتوى الملف"></textarea></section><div class="trash-confirm hidden"><span>الحذف الدائم يزيل العنصر من هذا المتصفح. نزّل نسخة أولًا إن احتجتها.</span><button data-files="confirm-delete">تأكيد الحذف الدائم</button><button data-files="cancel-delete">إلغاء</button></div><div class="file-status" role="status"></div></div></div></div>`;
   const status = content.querySelector(".file-status"),
     items = content.querySelector(".file-items"),
     editor = content.querySelector(".file-editor"),
@@ -123,7 +129,15 @@ export function setupFiles(content) {
       }
       items.append(wrapper);
     }
-    if (!entries.length) {
+    renderMedia();
+    if (
+      !entries.length &&
+      !mediaRecords.some((r) =>
+        folder === "trash"
+          ? r.deleted
+          : !r.deleted && ["root", "pictures", "downloads"].includes(folder),
+      )
+    ) {
       const p = document.createElement("p");
       p.className = "muted";
       p.textContent =
@@ -135,6 +149,73 @@ export function setupFiles(content) {
       items.append(p);
     }
   }
+  function renderMedia() {
+    const root = content.querySelector(".media-file-items");
+    root.replaceChildren();
+    root.hidden = Boolean(active);
+    const records = mediaRecords.filter(
+      (r) =>
+        (folder === "trash"
+          ? r.deleted
+          : !r.deleted &&
+            (["root", "downloads"].includes(folder) ||
+              (folder === "pictures" && r.type.startsWith("image/")))) &&
+        (!query || r.name.toLocaleLowerCase().includes(query)),
+    );
+    for (const r of records) {
+      const row = document.createElement("div");
+      row.className = "real-file-item";
+      const button = document.createElement("button");
+      button.textContent = `${r.type.startsWith("image/") ? "🖼" : "▶"} ${r.name}`;
+      button.setAttribute("aria-label", r.name);
+      button.onclick = () => {
+        if (!r.deleted) openMedia({ app: "media", id: r.id });
+      };
+      row.append(button);
+      for (const [operation, label] of r.deleted
+        ? [
+            ["restore", "استعادة"],
+            ["delete", "حذف دائم"],
+          ]
+        : [["trash", "نقل للسلة"]]) {
+        const action = document.createElement("button");
+        action.className = "file-row-action";
+        action.textContent = label;
+        action.setAttribute("aria-label", label + " " + r.name);
+        action.onclick = async () => {
+          if (operation === "delete" && action.dataset.confirm !== "yes") {
+            action.dataset.confirm = "yes";
+            action.textContent = "تأكيد الحذف الدائم";
+            return;
+          }
+          try {
+            await changeMedia(r.id, operation);
+            await reloadMedia();
+          } catch (error) {
+            tell(error.message);
+          }
+        };
+        row.append(action);
+      }
+      root.append(row);
+    }
+  }
+  async function reloadMedia() {
+    try {
+      const records = await listMedia();
+      if (closed) return;
+      mediaRecords = records;
+      renderMedia();
+    } catch (error) {
+      tell(error.message);
+    }
+  }
+  function openItem(event) {
+    data = loadFiles(storage);
+    open(event.detail.id);
+  }
+  content.addEventListener("myos:open-item", openItem);
+  window.addEventListener("myos:media-changed", reloadMedia);
   function open(id) {
     const entry = data.entries.find((e) => e.id === id && !e.deleted);
     if (!entry) return;
@@ -255,6 +336,16 @@ export function setupFiles(content) {
     const file = event.target.files[0];
     if (!file) return;
     try {
+      if (
+        /^(image|audio|video)\//.test(file.type) ||
+        file.type === "application/pdf"
+      ) {
+        const record = await saveMedia(file);
+        await reloadMedia();
+        openMedia({ app: "media", id: record.id });
+        tell("حُفظ ملف الوسائط في المكتبة ✓");
+        return;
+      }
       if (file.size > 500000)
         throw Error("الحد الأقصى للملف النصي 500 كيلوبايت");
       if (
@@ -303,5 +394,12 @@ export function setupFiles(content) {
   } catch {
     tell("تعذّر قراءة الملفات المحفوظة؛ لم يتم استبدالها.");
   }
-  return () => window.removeEventListener("storage", sync);
+  reloadMedia();
+  if (target) open(target.id);
+  return () => {
+    closed = true;
+    window.removeEventListener("storage", sync);
+    window.removeEventListener("myos:media-changed", reloadMedia);
+    content.removeEventListener("myos:open-item", openItem);
+  };
 }

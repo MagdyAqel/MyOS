@@ -50,7 +50,7 @@ test("a cached empty configuration cannot erase the deployed default and immedia
   await expect(page.locator(".arena-players")).toContainText(
     "اللاعب الأول متصل",
   );
-  expect(requested).toEqual({ stage: 0, map: "dunes" });
+  expect(requested).toEqual({ stage: 0, map: "dunes", startingCash: 2400 });
   await expect(input).toHaveValue(deployed);
 });
 test("failed configuration download and a corrupt saved server still leave a usable default", async ({

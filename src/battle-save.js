@@ -199,6 +199,7 @@ export function restoreBattle(raw) {
     fog: data.fog !== false,
     upgrades: data.upgrades,
     operationId: data.operationId,
+    equipment: data.equipment,
   });
   b.entities = [];
   b.nextId = 1;
@@ -255,7 +256,9 @@ export function restoreBattle(raw) {
   b.explored = new Set(data.explored);
   b.selected = new Set(
     data.selected.filter((id) =>
-      b.entities.some((e) => e.id === id && e.team === "blue" && e.speed && !e.carriedBy),
+      b.entities.some(
+        (e) => e.id === id && e.team === "blue" && e.speed && !e.carriedBy,
+      ),
     ),
   );
   b.events = [];

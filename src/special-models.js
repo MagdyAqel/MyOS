@@ -35,6 +35,34 @@ export function specialModel(
     }
     return true;
   }
+  if (["repair", "ammoTruck", "engineer"].includes(e.type)) {
+    if (e.type === "engineer") {
+      cylinder(g, 5, 13, color, 0, 12, 0);
+      mesh(new THREE.SphereGeometry(4, 8, 6), "#d5b087", g, 0, 23, 0);
+      cylinder(g, 5, 4, "#f1bc35", 0, 26, 0);
+      g.userData.legs = [
+        box(g, 3, 10, 3, dark, -3, 3, 0),
+        box(g, 3, 10, 3, dark, 3, 3, 0),
+      ];
+      box(g, 9, 9, 5, "#bd934b", 0, 13, -6);
+    } else {
+      box(g, 27, 8, 45, dark, 0, 9, 0);
+      box(g, 25, 19, 17, color, 0, 22, 17);
+      box(g, 21, 7, 2, light, 0, 25, 26);
+      for (const x of [-16, 16])
+        for (const z of [-15, 0, 19])
+          cylinder(g, 6, 4, dark, x, 7, z).rotation.z = Math.PI / 2;
+      if (e.type === "repair") {
+        box(g, 22, 18, 27, "#d5ae4f", 0, 20, -7);
+        box(g, 3, 32, 3, dark, 0, 42, -8);
+        box(g, 3, 3, 28, dark, 0, 58, 4);
+      } else {
+        box(g, 24, 22, 30, color, 0, 23, -8);
+        for (const z of [-17, -5]) box(g, 20, 3, 5, "#b09b5d", 0, 35, z);
+      }
+    }
+    return true;
+  }
   if (!["apc", "artillery"].includes(e.type)) return false;
   box(g, 32, e.type === "apc" ? 20 : 13, 48, color, 0, 16, 0);
   for (const x of [-19, 19])

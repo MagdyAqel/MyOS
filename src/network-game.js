@@ -23,8 +23,25 @@ export function bindNetworkGame(
     "[data-game=save]",
     "[data-game=resume]",
     "[data-game=fog]",
+    "[data-game=configure]",
+    "[data-game=campaign]",
   ];
   const controls = connection.controls;
+  let match = 0;
+  const actions = document.createElement("div");
+  actions.className = "online-match-actions";
+  for (const [type, label] of [
+    ["surrender", "استسلام"],
+    ["rematch", "إعادة المواجهة"],
+  ]) {
+    const button = document.createElement("button");
+    button.dataset.online = type;
+    button.textContent = label;
+    button.onclick = () => connection.send({ type });
+    actions.append(button);
+  }
+  content.querySelector(".rts-app").classList.add("network-match");
+  content.querySelector(".rts-header").append(actions);
   function request(action) {
     const b = getBattle();
     return connection.action({ ...action, selected: [...(b?.selected || [])] });
@@ -35,10 +52,17 @@ export function bindNetworkGame(
       const data = connection.state,
         old = getBattle(),
         b = restoreBattle(data.battle);
+      if (match !== data.match) {
+        if (old) old.selected.clear();
+        controls.groups = {};
+        match = data.match;
+      }
       b.paused = data.phase !== "playing";
       b.selected = new Set(
         [...(old?.selected || [])].filter((id) =>
-          b.entities.some((e) => e.id === id && e.team === "blue" && !e.carriedBy),
+          b.entities.some(
+            (e) => e.id === id && e.team === "blue" && !e.carriedBy,
+          ),
         ),
       );
       b.groups = controls.groups;
@@ -108,7 +132,12 @@ export function bindNetworkGame(
     const wave = content.querySelector("[data-stat=wave]");
     wave.textContent = "مواجهة شخصين";
     wave.dataset.short = "عبر الويب";
-    header.textContent = `${connection.session.side === "blue" ? "مقرك في اليسار" : "مقرك في اليمين"} · ${connection.status}`;
+    actions.querySelector("[data-online=surrender]").disabled =
+      b.status !== "playing" || connection.state?.phase === "waiting";
+    actions.querySelector("[data-online=rematch]").disabled =
+      b.status === "playing" ||
+      !!connection.state?.players[connection.session.side].rematch;
+    header.textContent = `${connection.state?.players.blue.name || "اللاعب الأول"} × ${connection.state?.players.red.name || "اللاعب الثاني"} · ${connection.latency === null ? "قياس الاتصال" : connection.latency + " ms"} · ${connection.session.side === "blue" ? "مقرك في اليسار" : "مقرك في اليمين"} · ${connection.status}`;
     if (connection.socket?.readyState !== WebSocket.OPEN) b.paused = true;
     if (b.status === "playing" && b.paused) {
       const result = content.querySelector(".rts-result");

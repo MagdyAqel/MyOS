@@ -116,3 +116,85 @@ test("room API rejects unapproved web origins", async ({ request }) => {
   });
   expect(response.status()).toBe(403);
 });
+
+test("custom funds, commander names, countdown, RTT, surrender and mutual rematch work across two browsers", async ({
+  browser,
+}) => {
+  const a = await browser.newContext(),
+    b = await browser.newContext();
+  const host = await a.newPage(),
+    guest = await b.newPage();
+  try {
+    await openArena(host);
+    await host
+      .getByRole("textbox", { name: "اسم القائد", exact: true })
+      .fill("Magdy");
+    await host
+      .getByRole("spinbutton", { name: "مال بداية المواجهة", exact: true })
+      .fill("15000");
+    await host.locator("[data-arena=create]").click();
+    await expect(host.locator(".arena-qr svg")).toBeVisible();
+    const invitation = await host
+      .getByRole("textbox", { name: "رابط دعوة صديقك", exact: true })
+      .inputValue();
+    expect(invitation).not.toContain("token");
+    await openArena(guest);
+    await guest
+      .getByRole("textbox", { name: "اسم القائد", exact: true })
+      .fill("Wing");
+    await guest
+      .getByRole("textbox", { name: "رمز الغرفة أو رابط الدعوة", exact: true })
+      .fill(invitation);
+    await guest.locator("[data-arena=join]").click();
+    await expect(host.locator(".arena-latency")).toContainText("Magdy × Wing");
+    await expect(guest.locator(".arena-latency")).toContainText("$15000");
+    await host.locator("[data-arena=ready]").click();
+    await guest.locator("[data-arena=ready]").click();
+    await expect(host.locator(".arena-status")).toContainText(
+      "تبدأ المواجهة خلال",
+    );
+    await expect(host.locator(".arena-status")).toContainText("المواجهة جارية");
+    await expect(guest.locator(".arena-latency")).toContainText(/\d+ ms/);
+    await guest.setViewportSize({ width: 390, height: 844 });
+    for (const page of [host, guest]) {
+      await page.locator("[data-arena=play]").click();
+      await expect(page.locator("[data-stat=cash]")).toHaveText("$15000");
+      await expect(page.locator("[data-game=configure]")).toBeDisabled();
+    }
+    const bounds = await host.locator(".game-window").boundingBox();
+    expect(bounds.x).toBe(0);
+    expect(bounds.y).toBe(0);
+    expect(bounds.width).toBe(1280);
+
+    await host.screenshot({ path: "/tmp/MyOS-4.2-online.png" });
+    expect(
+      await guest.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    expect(
+      (await guest.locator("canvas").boundingBox()).height,
+    ).toBeGreaterThan(250);
+    await guest.screenshot({ path: "/tmp/MyOS-4.2-mobile.png" });
+    await guest.locator("[data-online=surrender]").click();
+    await expect(host.locator(".rts-result")).toContainText("انتصار");
+    await expect(guest.locator(".rts-result")).toContainText("انتهت المهمة");
+    await host.locator("[data-online=rematch]").click();
+    await expect(host.locator("[data-online=rematch]")).toBeDisabled();
+    await expect(guest.locator(".rts-result")).toContainText("انتهت المهمة");
+    await guest.locator("[data-online=rematch]").click();
+    await expect(host.locator(".online-match-status")).toContainText(
+      "تبدأ المواجهة خلال",
+    );
+    await expect(guest.locator(".online-match-status")).toContainText(
+      "المواجهة جارية",
+    );
+    for (const page of [host, guest]) {
+      await expect(page.locator("[data-stat=cash]")).toHaveText("$15000");
+      await expect(page.locator("[data-stat=army]")).toContainText("المحدد 0");
+    }
+  } finally {
+    await a.close();
+    await b.close();
+  }
+});

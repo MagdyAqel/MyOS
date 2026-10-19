@@ -3,7 +3,7 @@ export function cueForUnit(type) {
     {
       soldier: "rifle",
       apc: "rifle",
-      artillery: "naval",
+      artillery: "artillery",
       drone: "bomb",
       tank: "cannon",
       turret: "missile",
@@ -27,13 +27,14 @@ export function loadSoundSettings(storage) {
   }
 }
 // Layered, locally synthesized effects; no recordings, downloads or autoplay.
-export function scheduleCue(ctx, name, destination, pan = 0) {
+export function scheduleCue(ctx, name, destination, pan = 0, strength = 1) {
   const now = ctx.currentTime,
     nodes = [],
     sources = [];
   const output = ctx.createGain(),
     panner = ctx.createStereoPanner();
-  output.gain.value = 0.55;
+  output.gain.value = 0.5 * Math.max(0, Math.min(1, strength));
+  const variation = 0.94 + ((Math.floor(now * 997) % 17) / 16) * 0.12;
   panner.pan.value = Math.max(-0.8, Math.min(0.8, pan));
   output.connect(panner);
   panner.connect(destination);
@@ -43,7 +44,7 @@ export function scheduleCue(ctx, name, destination, pan = 0) {
     const source = ctx.createOscillator(),
       envelope = ctx.createGain();
     source.type = wave;
-    source.frequency.setValueAtTime(freq, now + delay);
+    source.frequency.setValueAtTime(freq * variation, now + delay);
     source.frequency.exponentialRampToValueAtTime(
       Math.max(1, end),
       now + delay + duration,
@@ -67,7 +68,7 @@ export function scheduleCue(ctx, name, destination, pan = 0) {
         ctx.sampleRate,
       ),
       data = buffer.getChannelData(0);
-    let seed = 12345;
+    let seed = 12345 + Math.floor(now * 10007);
     for (let i = 0; i < data.length; i++) {
       seed = (seed * 1664525 + 1013904223) >>> 0;
       data[i] = seed / 2147483648 - 1;
@@ -96,6 +97,14 @@ export function scheduleCue(ctx, name, destination, pan = 0) {
     case "cannon":
       noise(0.48, 0.65, 850);
       tone(105, 28, 0.42, 0.65);
+      break;
+    case "artillery":
+      noise(1.05, 0.52, 620);
+      tone(92, 24, 0.8, 0.6);
+      tone(180, 46, 0.35, 0.12, "triangle", 0.03);
+      break;
+    case "support":
+      tone(700, 1050, 0.12, 0.035);
       break;
     case "naval":
       noise(0.7, 0.6, 520);
@@ -171,6 +180,7 @@ export class BattleAudio {
     this.sonar = 0;
     this.voices = new Set();
     this.lastKind = "";
+    this.preferences = { effects: 0.85, ambience: 0.4, profile: "headphones" };
     this.terminalUntil = 0;
   }
   async enable() {
@@ -182,6 +192,33 @@ export class BattleAudio {
       const limiter = this.context.createDynamicsCompressor();
       limiter.threshold.value = -16;
       limiter.ratio.value = 6;
+      this.effectsBus = this.context.createGain();
+      this.ambientBus = this.context.createGain();
+      const filter = this.context.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.value = 14000;
+      this.effectsBus.connect(filter);
+      filter.connect(this.master);
+      this.ambientBus.connect(this.master);
+      this.reverb = this.context.createConvolver();
+      const impulse = this.context.createBuffer(
+        2,
+        Math.ceil(this.context.sampleRate * 0.65),
+        this.context.sampleRate,
+      );
+      for (let c = 0; c < 2; c++) {
+        const data = impulse.getChannelData(c);
+        for (let i = 0; i < data.length; i++)
+          data[i] =
+            (Math.random() * 2 - 1) * Math.pow(1 - i / data.length, 3) * 0.18;
+      }
+      this.reverb.buffer = impulse;
+      const wet = this.context.createGain();
+      wet.gain.value = 0.13;
+      this.effectsBus.connect(this.reverb);
+      this.reverb.connect(wet);
+      wet.connect(this.master);
+      this.configure(this.preferences);
       this.master.connect(limiter);
       limiter.connect(this.context.destination);
       this.master.gain.value = 0;
@@ -190,6 +227,21 @@ export class BattleAudio {
     if (this.context.state !== "running")
       throw Error("اضغط تشغيل الصوت مجددًا للسماح به");
     this.enabled = true;
+  }
+  configure(value) {
+    this.preferences = { ...this.preferences, ...value };
+    if (this.effectsBus)
+      this.effectsBus.gain.setTargetAtTime(
+        this.preferences.effects,
+        this.context.currentTime,
+        0.03,
+      );
+    if (this.ambientBus)
+      this.ambientBus.gain.setTargetAtTime(
+        this.preferences.ambience,
+        this.context.currentTime,
+        0.1,
+      );
   }
   mute() {
     this.enabled = false;
@@ -275,7 +327,7 @@ export class BattleAudio {
               : 500;
       source.connect(filter);
       filter.connect(gain);
-      gain.connect(this.master);
+      gain.connect(this.ambientBus);
       gain.gain.value = 0.04;
       source.start();
       const motor = ctx.createOscillator(),
@@ -291,7 +343,7 @@ export class BattleAudio {
               : 42;
       motorGain.gain.value = 0.015;
       motor.connect(motorGain);
-      motorGain.connect(this.master);
+      motorGain.connect(this.ambientBus);
       motor.start();
       this.ambient = { source, filter, gain, motor, motorGain };
     }
@@ -315,7 +367,7 @@ export class BattleAudio {
       0.3,
     );
   }
-  play(name, x = 500) {
+  play(name, x = 500, y = 310) {
     if (!this.active || !this.enabled || !this.context || this.volume === 0)
       return;
     const now = this.context.currentTime;
@@ -323,7 +375,30 @@ export class BattleAudio {
     if ((now - this.lastCue < 0.025 && !priority) || this.voices.size >= 16)
       return;
     this.lastCue = now;
-    const voice = scheduleCue(this.context, name, this.master, (x - 500) / 650);
+    const listener = this.listener || { x: 500, y: 310 };
+    const spatial = [
+      "rifle",
+      "cannon",
+      "naval",
+      "bomb",
+      "missile",
+      "torpedo",
+      "artillery",
+      "explosion",
+      "support",
+    ].includes(name);
+    const distance = spatial ? Math.hypot(x - listener.x, y - listener.y) : 0;
+    const pan =
+      spatial && this.preferences.profile === "headphones"
+        ? (x - listener.x) / 500
+        : 0;
+    const voice = scheduleCue(
+      this.context,
+      name,
+      this.effectsBus,
+      pan,
+      1 / (1 + distance / 550),
+    );
     this.voices.add(voice);
     setTimeout(() => this.voices.delete(voice), (voice.duration + 0.1) * 1000);
   }
@@ -353,6 +428,7 @@ export class BattleAudio {
       this.play(
         event.kind === "shot" ? cueForUnit(event.type) : event.kind,
         event.x,
+        event.y,
       );
   }
   async dispose() {

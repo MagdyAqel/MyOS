@@ -60,6 +60,7 @@ test("story campaign restarts its operation and leaves practice stages available
   await open(page, "strategy");
   await page.locator(".career-details summary").click();
   await page.locator("[data-career=start]").click();
+  await page.locator(".battle-setup button[value=start]").click();
   await expect(page.locator(".mission-objective")).toContainText("القافلة");
   await page.locator("[data-game=restart]").click();
   await expect(page.locator(".mission-objective")).toContainText("القافلة");
@@ -400,6 +401,7 @@ test("campaign victory awards one point, buys armor and opens the next operation
   await page.locator("[data-upgrade=armor]").click();
   await expect(page.locator("[data-upgrade=armor]")).toContainText("1/3");
   await page.locator("[data-game=next]").click();
+  await page.locator(".battle-setup button[value=start]").click();
   await expect(page.locator(".mission-objective")).toContainText("فرق الإخلاء");
   await page.locator("[data-game=save]").click();
   const state = await page.evaluate(() =>

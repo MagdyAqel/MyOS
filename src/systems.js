@@ -23,7 +23,7 @@ export const MISSIONS = [
   {
     id: "siege",
     name: "كسر الحصار",
-    stages: [0],
+    stages: [0, 2],
     description:
       "استطلع الهدف ثم دمّر مقر العدو؛ المدفعية تضرب من مسافة بعيدة وتحتاج حماية من الاقتراب.",
   },
@@ -55,8 +55,9 @@ export const MISSIONS = [
   {
     id: "survive",
     name: "حماية محطة الأعماق",
-    stages: [3],
-    description: "احمِ محطة القيادة تحت الماء لمدة 150 ثانية.",
+    stages: [2, 3],
+    description:
+      "احمِ القيادة لمدة 150 ثانية؛ استخدم القوات المشتركة على الساحل أو الأسطول في الأعماق.",
   },
 ];
 export const EXTRA_TYPES = {
@@ -95,7 +96,7 @@ export function initializeSystems(b, options = {}) {
     ) || MISSIONS[0];
   b.objective = { hold: 0, kills: 0, evacuated: 0 };
   b.enemy = {
-    cash: 1200,
+    cash: options.startingCash === b.startingCash ? b.startingCash : 1200,
     nextDecision: 12,
     nextOrders: 8,
     lastHQ: { x: 130, y: b.stageIndex === 2 ? 140 : 320 },
@@ -171,11 +172,15 @@ export function updateEnemy(b, types) {
     const has = (type) =>
       b.entities.some((e) => e.type === type && e.team === "red" && e.hp > 0);
     const producer =
-      b.stageIndex === 0
-        ? "factory"
-        : b.stageIndex === 1
-          ? "airfield"
-          : "harbor";
+      b.stageIndex === 2
+        ? ["factory", "airfield", "harbor"][
+            Math.floor(b.time / settings.decision) % 3
+          ]
+        : b.stageIndex === 0
+          ? "factory"
+          : b.stageIndex === 1
+            ? "airfield"
+            : "harbor";
     const wanted = ["power", "supply", producer].find((type) => !has(type));
     if (wanted && enemy.cash >= types[wanted].cost) {
       const point = site(b, wanted, types);
@@ -273,6 +278,7 @@ export function serviceUnit(b, unit) {
   );
   const base = bases.sort((a, c) => distance(unit, a) - distance(unit, c))[0];
   if (!base) return;
+  unit.stance = "normal";
   unit.servicing = true;
   unit.tactical = null;
   unit.order = b.constrain(unit, base.x, base.y);
@@ -280,7 +286,7 @@ export function serviceUnit(b, unit) {
 }
 export function updateLogistics(b, dt) {
   for (const unit of b.entities.filter(
-    (e) => e.speed && e.damage && e.hp > 0 && !e.carriedBy,
+    (e) => e.speed && e.maxAmmo && e.hp > 0 && !e.carriedBy,
   )) {
     if (
       (unit.ammo === 0 ||

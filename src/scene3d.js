@@ -334,8 +334,10 @@ export function createBattleScene(
       cylinder(g, 5, 12, color, 0, 12, 0);
       mesh(new THREE.SphereGeometry(4, 8, 8), "#d0b18a", g, 0, 22, 0);
       cylinder(g, 4.5, 4, dark, 0, 25, 0);
-      box(g, 3, 9, 3, dark, -3, 3, 0);
-      box(g, 3, 9, 3, dark, 3, 3, 0);
+      g.userData.legs = [
+        box(g, 3, 9, 3, dark, -3, 3, 0),
+        box(g, 3, 9, 3, dark, 3, 3, 0),
+      ];
       box(g, 3, 3, 15, "#33434a", 5, 14, 5);
     } else if (e.domain === "sub") {
       cylinder(g, e.radius, 18, color, 0, 0, 0);
@@ -484,7 +486,10 @@ export function createBattleScene(
         e.type === "recon" && battle.selected.has(e.id) && e.team === "blue",
     );
     reconArea.visible = Boolean(scout);
-    if (scout) reconArea.position.set(scout.x - 500, 4, scout.y - 310);
+    if (scout) {
+      reconArea.position.set(scout.x - 500, 4, scout.y - 310);
+      reconArea.scale.setScalar((scout.vision || 110) / 110);
+    }
     objectiveArea.visible = battle.mission.id === "recon";
     while (shellModels.length < battle.shells.length) {
       const projectile = mesh(
@@ -556,9 +561,19 @@ export function createBattleScene(
       g.userData.hp.scale.x = Math.max(0.01, e.hp / e.maxHp);
       g.userData.detail.update(e, battle.time, quality);
       if (g.userData.rotor) g.userData.rotor.rotation.z = battle.time * 35;
-      if (g.userData.weaponPivot)
+      if (g.userData.legs)
+        g.userData.legs.forEach(
+          (leg, i) =>
+            (leg.rotation.x =
+              e.velocity > 2
+                ? Math.sin(battle.time * 10 + e.id + i * Math.PI) * 0.6
+                : 0),
+        );
+      if (g.userData.weaponPivot) {
         g.userData.weaponPivot.rotation.y =
           (e.aim ?? e.heading ?? g.rotation.y) - g.rotation.y;
+        g.userData.weaponPivot.position.z = -(e.firing || 0) * 15;
+      }
     }
     const vertices = [];
     for (const e of battle.effects)

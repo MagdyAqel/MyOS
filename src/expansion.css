@@ -1,0 +1,134 @@
+.battle-setup {
+  max-width: min(440px, 94vw);
+  max-height: 90dvh;
+  overflow: auto;
+  border: 1px solid #638da5;
+  border-radius: 18px;
+  padding: 22px;
+  background: #142c38;
+  color: #e1f1f5;
+  box-shadow: 0 24px 90px #000a;
+  direction: rtl;
+}
+.battle-setup::backdrop {
+  background: #03101dc9;
+}
+.battle-setup form {
+  display: grid;
+  gap: 12px;
+}
+.battle-setup h2,
+.battle-setup p {
+  margin: 0;
+}
+.battle-setup label {
+  display: grid;
+  gap: 8px;
+}
+.battle-setup input,
+.battle-setup button {
+  min-height: 44px;
+  padding: 8px;
+  border: 1px solid #688995;
+  border-radius: 8px;
+  background: #254753;
+  color: white;
+  font: inherit;
+}
+.battle-preferences {
+  margin-top: 14px;
+  padding: 10px;
+  border: 1px solid #3c6169;
+  border-radius: 9px;
+}
+.battle-preferences label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0;
+}
+.battle-preferences input[type="range"] {
+  max-width: 100%;
+  width: 140px;
+}
+.battle-preferences input[type="checkbox"] {
+  width: 22px;
+  height: 22px;
+}
+.selection-box {
+  position: absolute;
+  z-index: 6;
+  border: 1px solid #93ecff;
+  background: #79dbff26;
+  pointer-events: none;
+  box-sizing: border-box;
+}
+.selection-box[hidden],
+.touch-orders[hidden],
+[hidden] {
+  display: none !important;
+}
+.touch-orders {
+  position: absolute;
+  bottom: 60px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  z-index: 9;
+  background: #142c38ed;
+  padding: 8px;
+  border-radius: 12px;
+}
+.touch-orders button {
+  flex: 1;
+  min-height: 44px;
+}
+.selection-detail {
+  font-size: 12px;
+  line-height: 1.8;
+  max-height: 130px;
+  overflow: auto;
+}
+.selection-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.selection-actions label {
+  grid-column: 1/-1;
+  display: grid;
+  gap: 6px;
+}
+.briefing-goals {
+  color: #f0d67e;
+}
+.performance-status {
+  color: #9bdbdb;
+}
+.arena-qr {
+  max-width: 220px;
+  padding: 10px;
+  background: white;
+  margin: 12px auto;
+  border-radius: 12px;
+}
+.arena-qr svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.online-match-actions {
+  display: flex;
+  gap: 6px;
+  padding: 4px 12px;
+}
+.online-match-actions button {
+  min-height: 36px;
+  font: inherit;
+}
+.arena-latency {
+  font-variant-numeric: tabular-nums;
+}

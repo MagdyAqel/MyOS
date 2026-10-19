@@ -5,6 +5,7 @@ const CELL = 25,
 export function walkable(map, unit, x, y) {
   if (x < 15 || x > 985 || y < 15 || y > 605) return false;
   if (unit.domain === "air") return true;
+  if (map.stage === 2 && unit.domain === "ground" && y > 235) return false;
   if (map.stage === 2 && ["sea", "sub"].includes(unit.domain) && y < 285)
     return false;
   return !blocked(map, x, y, unit.radius + 3);

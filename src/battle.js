@@ -1,4 +1,10 @@
-import { STAGES } from "./campaign.js";
+import {
+  SUPPORT_TYPES,
+  updateSupport,
+  targetScore,
+  startingMoney,
+} from "./battle-expansion.js";
+import { STAGES, FORCE_PHASES, OPERATION_PHASES } from "./campaign.js";
 import { mapFor, blocked } from "./maps.js";
 import { moveUnit, clearShot, walkable } from "./navigation.js";
 import {
@@ -34,6 +40,7 @@ export const WIDTH = 1000,
 export const TYPES = {
   ...EXTRA_TYPES,
   ...SPECIAL_TYPES,
+  ...SUPPORT_TYPES,
   hq: { name: "مركز القيادة", hp: 1800, radius: 38, domain: "ground" },
   power: {
     name: "محطة طاقة",
@@ -176,12 +183,26 @@ const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 export class Battle {
   constructor(stage = 0, mapId, options = {}) {
     this.stageIndex = Number.isInteger(stage) && STAGES[stage] ? stage : 0;
-    this.stage = STAGES[this.stageIndex];
+    this.forcePhase = OPERATION_PHASES[options.operationId] || null;
+    this.stage = {
+      ...STAGES[this.stageIndex],
+      units: [...STAGES[this.stageIndex].units],
+      buildings: [...STAGES[this.stageIndex].buildings],
+    };
+    if (this.forcePhase === "armor") {
+      this.stage.units = this.stage.units.filter(
+        (type) => TYPES[type].domain === "ground",
+      );
+      this.stage.buildings = this.stage.buildings.filter(
+        (type) => !["airfield", "harbor"].includes(type),
+      );
+    }
     this.map = mapFor(this.stageIndex, mapId);
     this.events = [];
     this.eventSequence = 0;
     this.nextId = 1;
-    this.cash = this.stage.cash;
+    this.cash = startingMoney(options.startingCash, this.stage.cash);
+    this.startingCash = this.cash;
     this.time = 0;
     this.wave = 0;
     this.nextWave = this.stage.interval;
@@ -192,6 +213,12 @@ export class Battle {
     this.effects = [];
     this.shells = [];
     this.entities = [];
+    this.equipment = Object.fromEntries(
+      ["reinforced", "precision", "veteran"].map((k) => [
+        k,
+        options.equipment?.[k] === true,
+      ]),
+    );
     this.upgrades = normalizeUpgrades(options.upgrades);
     this.message = this.stage.description;
     const navy = this.stageIndex >= 2,
@@ -211,6 +238,8 @@ export class Battle {
       this.add("fighter", "blue", 230, 280);
       this.add("fighter", "blue", 240, 360);
       this.add("bomber", "blue", 190, 310);
+      this.add("tank", "blue", 240, 180);
+      this.add("soldier", "blue", 260, 220);
     }
     if (navy) {
       this.add("power", "blue", 70, 70);
@@ -219,15 +248,27 @@ export class Battle {
       this.add("submarine", "blue", 230, 420);
       this.add(abyss ? "submarine" : "destroyer", "blue", 180, 500);
     }
+    if (this.stageIndex === 2) {
+      this.add("tank", "blue", 235, 135);
+      this.add("soldier", "blue", 210, 190);
+      this.add("soldier", "blue", 255, 190);
+      this.add("fighter", "blue", 275, 280);
+      this.add("bomber", "blue", 210, 420);
+    }
     initializeSystems(this, options);
     initializeTactics(this, options);
     if (this.mission.id === "recon") this.add("recon", "blue", 200, 450);
     if (this.mission.id === "siege") {
-      this.add("power", "blue", 75, 75);
-      this.add("factory", "blue", 125, 485);
-      this.add("airfield", "blue", 100, 150);
-      this.add("artillery", "blue", 270, 405);
-      this.add("apc", "blue", 235, 350);
+      if (!this.has("power")) this.add("power", "blue", 75, 75);
+      this.add("factory", "blue", 320, this.stageIndex === 2 ? 80 : 485);
+      this.add(
+        "airfield",
+        "blue",
+        this.stageIndex === 2 ? 420 : 100,
+        this.stageIndex === 2 ? 155 : 150,
+      );
+      this.add("artillery", "blue", 270, this.stageIndex === 2 ? 155 : 405);
+      this.add("apc", "blue", 235, this.stageIndex === 2 ? 205 : 350);
       this.add("recon", "blue", 235, 460);
     }
   }
@@ -271,6 +312,22 @@ export class Battle {
       if (e.damage)
         e.damage = Math.round(e.damage * (1 + this.upgrades.weapons * 0.08));
       e.maxAmmo = Math.round(e.maxAmmo * (1 + this.upgrades.logistics * 0.2));
+    }
+    if (team === "blue") {
+      if (this.equipment.reinforced) e.maxAmmo = Math.round(e.maxAmmo * 1.2);
+      if (this.equipment.precision && e.range)
+        e.range = Math.round(e.range * 1.08);
+      if (this.equipment.veteran)
+        e.vision = Math.round(
+          (e.vision ||
+            (e.domain === "air"
+              ? 340
+              : e.type === "hq"
+                ? 280
+                : e.speed
+                  ? 230
+                  : 190)) * 1.15,
+        );
     }
     e.ammo = e.maxAmmo;
     if (e.domain === "air") e.flight = 1;
@@ -319,7 +376,10 @@ export class Battle {
             ? 285
             : 25
           : 20,
-        Math.min(595, y),
+        Math.min(
+          this.stageIndex === 2 && unit.domain === "ground" ? 230 : 595,
+          y,
+        ),
       ),
     };
   }
@@ -469,7 +529,7 @@ export class Battle {
       !Number.isFinite(y)
     )
       return;
-    if (this.commandMode !== "move") {
+    if (["patrol", "guard"].includes(this.commandMode)) {
       issueTacticalOrder(this, this.commandMode, x, y);
       return;
     }
@@ -498,6 +558,7 @@ export class Battle {
       }
       unit.route = null;
       unit.tactical = null;
+      unit.stance = this.commandMode === "attackMove" ? "attackMove" : "normal";
       delete unit.recon;
       delete unit.boarding;
       unit.servicing = false;
@@ -530,6 +591,7 @@ export class Battle {
     advanceShells(this, dt);
     if (!this.multiplayer) updateEnemy(this, TYPES);
     updateLogistics(this, dt);
+    updateSupport(this, dt);
     advanceMission(this, dt);
     updateExploration(this);
     this.income += dt;
@@ -576,7 +638,15 @@ export class Battle {
           type,
           "red",
           940,
-          this.stageIndex >= 2 ? 320 + i * 32 : 110 + i * 42,
+          this.stageIndex === 2
+            ? ["sea", "sub"].includes(TYPES[type].domain)
+              ? 320 + (i % 7) * 32
+              : TYPES[type].domain === "ground"
+                ? 70 + (i % 5) * 32
+                : 130 + (i % 6) * 60
+            : this.stageIndex === 3
+              ? 320 + i * 32
+              : 110 + i * 42,
         );
       }
       this.message = `الموجة ${this.wave} تقترب! احمِ مركز القيادة.`;
@@ -624,7 +694,7 @@ export class Battle {
             (!unit.indirect || !unit.order || unit.order.target) &&
             (unit.indirect || clearShot(this.map, unit, e)),
         )
-        .sort((a, b) => distance(unit, a) - distance(unit, b))[0];
+        .sort((a, b) => targetScore(unit, a) - targetScore(unit, b))[0];
       const target =
         ordered &&
         distance(unit, ordered) <= unit.range + ordered.radius &&
@@ -704,7 +774,7 @@ export class Battle {
               life: 0.2,
             });
         }
-      } else if (unit.speed) {
+      } else if (unit.speed && unit.stance !== "hold") {
         if (
           unit.indirect &&
           ordered &&
@@ -724,8 +794,15 @@ export class Battle {
           continue;
         }
         const enemyHQ = opponents.find((e) => e.type === "hq");
+        const advanceTarget =
+          unit.stance === "attackMove"
+            ? opponents
+                .filter((e) => distance(unit, e) < (unit.vision || 230))
+                .sort((a, b) => targetScore(unit, a) - targetScore(unit, b))[0]
+            : null;
         const destination =
           ordered ||
+          advanceTarget ||
           (unit.order?.x !== undefined ? unit.order : null) ||
           (unit.team === "red" && !this.multiplayer
             ? enemyHQ && this.isVisible(enemyHQ, "red")
@@ -761,6 +838,9 @@ export class Battle {
         this.objective.kills++;
       if (entity.hp <= 0)
         this.emit("explosion", {
+          type: entity.type,
+          team: entity.team,
+          heading: entity.heading || 0,
           x: entity.x,
           y: entity.y,
           domain: entity.domain,

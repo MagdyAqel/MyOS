@@ -75,6 +75,7 @@ export function issueTacticalOrder(b, kind, x, y) {
     return false;
   }
   units.forEach((e, i) => {
+    e.stance = "normal";
     e.servicing = false;
     delete e.boarding;
     delete e.recon;
