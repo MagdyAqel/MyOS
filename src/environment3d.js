@@ -171,16 +171,17 @@ export function enhanceEnvironment(scene, terrain, stage, map) {
           0.12,
           "flash",
         );
-        spawn(
-          start.x,
-          start.y,
-          start.z,
-          e.type === "submarine" ? "#b4f0ff" : "#ffc66c",
-          e.type === "soldier" ? 3 : 7,
-          0.35,
-          "projectile",
-          { x: e.tx - 500, y: level(e.targetDomain), z: e.ty - 310 },
-        );
+        if (e.type !== "artillery")
+          spawn(
+            start.x,
+            start.y,
+            start.z,
+            e.type === "submarine" ? "#b4f0ff" : "#ffc66c",
+            e.type === "soldier" ? 3 : 7,
+            0.35,
+            "projectile",
+            { x: e.tx - 500, y: level(e.targetDomain), z: e.ty - 310 },
+          );
       }
     }
   }

@@ -95,7 +95,7 @@ function openApp(id,matchConnection=null){
   if(id==='calculator') setupCalculator(content);
   if(id==='files') w.cleanup=setupFiles(content);
   if(id==='settings'){w.cleanup=setupPersonalization(content,wallpaperManager,setTheme);setupAppearance(content);}
-  if(id==='about')content.innerHTML='<div class="about-page"><span class="about-mark">◈</span><h2>MyOS</h2><p>سطح مكتب صغير. احتمالات كبيرة.</p><p class="muted">محاكاة تفاعلية مستوحاة من ويندوز 11 تعمل داخل المتصفح.<br>ليست نظام تشغيل حقيقيًا، ولا تشغّل برامج Windows.</p><span class="version">الإصدار 4.0 · Develped by:Pro. Magdy S. Aqel</span></div>';
+  if(id==='about')content.innerHTML='<div class="about-page"><span class="about-mark">◈</span><h2>MyOS</h2><p>سطح مكتب صغير. احتمالات كبيرة.</p><p class="muted">محاكاة تفاعلية مستوحاة من ويندوز 11 تعمل داخل المتصفح.<br>ليست نظام تشغيل حقيقيًا، ولا تشغّل برامج Windows.</p><span class="version">الإصدار 4.1 · Develped by:Pro. Magdy S. Aqel</span></div>';
 }
 const wallpaperManager=createWallpaperManager();
 function setupCalculator(content){

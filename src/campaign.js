@@ -8,8 +8,8 @@ export const STAGES = [
     waves: 5,
     interval: 40,
     description: "أنشئ خطوط الإمداد، درّب المدرعات ودمّر مقر العدو في الصحراء.",
-    buildings: ["supply", "power", "barracks", "factory", "turret"],
-    units: ["soldier", "tank"],
+    buildings: ["supply", "power", "barracks", "factory", "airfield", "turret"],
+    units: ["soldier", "tank", "apc", "artillery", "recon", "drone"],
     enemies: ["soldier", "soldier", "tank"],
   },
   {
@@ -22,8 +22,8 @@ export const STAGES = [
     interval: 48,
     description:
       "قد مقاتلاتك وقاذفاتك فوق الهضاب؛ احمِ القاعدة من الغارات ودمّر قيادة العدو.",
-    buildings: ["supply", "power", "airfield", "barracks", "turret"],
-    units: ["fighter", "bomber", "soldier"],
+    buildings: ["supply", "power", "airfield", "barracks", "factory", "turret"],
+    units: ["fighter", "bomber", "recon", "drone", "soldier", "apc", "artillery"],
     enemies: ["fighter", "fighter", "bomber"],
   },
   {
@@ -37,7 +37,7 @@ export const STAGES = [
     description:
       "أنشئ مبانيك على الساحل (أعلى الخريطة) والميناء عند الشاطئ، ثم أرسل السفن لمهاجمة مقر العدو.",
     buildings: ["supply", "power", "harbor", "airfield", "turret"],
-    units: ["destroyer", "submarine", "fighter"],
+    units: ["destroyer", "submarine", "fighter", "recon", "drone"],
     enemies: ["destroyer", "submarine", "destroyer"],
   },
   {

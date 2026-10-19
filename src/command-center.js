@@ -33,14 +33,14 @@ export function setupCommandCenter(
     .map(([k, v]) => `<button data-order-mode="${k}">${v}</button>`)
     .join(
       "",
-    )}</div><p>حدد الجيش ثم اختر الأمر وانقر الوجهة أو الهدف الصديق. الدورية تعود إلى نقطة الانطلاق تلقائيًا.</p><button data-tactic="depth">تبديل غوص الغواصات المحددة</button><div class="army-groups">${[1, 2, 3].map((i) => `<button data-group-save="${i}">حفظ ${i}</button><button data-group="${i}">مجموعة ${i}</button>`).join("")}</div><p>لوحة المفاتيح: Ctrl+1..3 حفظ مجموعة، 1..3 استدعاء، P دورية، G حماية، M تحرك، H نقل القيادة، Space إيقاف.</p></details><details class="career-details"><summary>الحملة والترقيات وتقارير المعارك</summary><p class="career-story"></p><button data-career="start">بدء / متابعة الحملة</button><p class="career-progress"></p><div class="career-upgrades">${Object.entries(
+    )}</div><p>حدد الجيش ثم اختر الأمر وانقر الوجهة أو الهدف الصديق. الدورية تعود إلى نقطة الانطلاق تلقائيًا.</p><button data-tactic="depth">تبديل غوص الغواصات المحددة</button><div class="army-groups">${[1, 2, 3].map((i) => `<button data-group-save="${i}">حفظ ${i}</button><button data-group="${i}">مجموعة ${i}</button>`).join("")}</div><p>لوحة المفاتيح: Ctrl+1..3 حفظ مجموعة، 1..3 استدعاء، P دورية، G حماية، M تحرك، H نقل القيادة، Space إيقاف.</p></details><details class="career-details"><summary>الحملة: 10 مراحل · الترقيات والتقارير</summary><p class="career-story"></p><button data-career="start">بدء / متابعة الحملة</button><p class="career-progress"></p><ol class="operation-list"></ol><div class="career-upgrades">${Object.entries(
     UPGRADE_NAMES,
   )
     .map(([k, v]) => `<button data-upgrade="${k}">${v}</button>`)
     .join(
       "",
     )}</div><p class="battle-report"></p><div class="career-history"></div><p class="career-feedback" role="status"></p><p>قائمة المراحل العادية تدريب حر. ترقيات الحملة تنطبق عند بدء مهمتها التالية؛ كل انتصار جديد يمنح نقطة ترقية.</p></details>`;
-  content.querySelector(".rts-panel").prepend(panel);
+  content.querySelector(".rts-panel").append(panel);
   const quality = document.createElement("label");
   quality.innerHTML =
     'جودة الرسومات <select aria-label="جودة الرسومات"><option value="auto">تلقائي</option><option value="low">اقتصادية للجوال</option><option value="medium">متوازنة</option><option value="high">عالية</option></select>';
@@ -63,16 +63,18 @@ export function setupCommandCenter(
       return false;
     }
   }
-  function runOperation() {
-    const op = nextOperation(career);
+  function runOperation(index = career.completed.length) {
+    if (!Number.isInteger(index) || index > career.completed.length)
+      index = career.completed.length;
+    const op = OPERATIONS[index];
     if (op)
-      start(op.stage, undefined, null, {
+      start(op.stage, op.map, null, {
         operationId: op.id,
         mission: op.mission,
         upgrades: career.upgrades,
       });
   }
-  panel.querySelector("[data-career=start]").onclick = runOperation;
+  panel.querySelector("[data-career=start]").onclick = () => runOperation();
   panel.querySelector("[data-tactic=relocate]").onclick = () => {
     arm("relocate");
     getBattle().message =
@@ -189,12 +191,27 @@ export function setupCommandCenter(
       p.textContent = `${OPERATIONS.find((o) => o.id === report.id)?.title || "تقرير"} · ${report.time} ث · أهداف ${report.kills} · خسائر ${report.losses}`;
       history.append(p);
     }
+    const list = panel.querySelector(".operation-list");
+    if (list.dataset.completed !== String(career.completed.length)) {
+      list.replaceChildren();
+      OPERATIONS.forEach((o, i) => {
+        const li = document.createElement("li"),
+          button = document.createElement("button");
+        button.textContent = `${i + 1}. ${o.title}`;
+        button.disabled = i > career.completed.length;
+        button.dataset.operation = o.id;
+        button.onclick = () => runOperation(i);
+        li.append(button);
+        list.append(li);
+      });
+      list.dataset.completed = String(career.completed.length);
+    }
     const op = nextOperation(career);
     panel.querySelector(".career-story").textContent = op
-      ? `${career.completed.length + 1}/8 · ${op.title}: ${op.story}`
+      ? `${career.completed.length + 1}/${OPERATIONS.length} · ${op.title}: ${op.story}`
       : "أتممت الحملة. يمكن إعادة تجربة الخرائط في التدريب الحر.";
     panel.querySelector(".career-progress").textContent =
-      `خبرة: ${career.xp} · نقاط ترقية: ${career.points} · عمليات مكتملة: ${career.completed.length}/8`;
+      `خبرة: ${career.xp} · نقاط ترقية: ${career.points} · عمليات مكتملة: ${career.completed.length}/${OPERATIONS.length}`;
     panel.querySelector("[data-career=start]").disabled = !op;
     for (const button of panel.querySelectorAll("[data-upgrade]")) {
       const key = button.dataset.upgrade;

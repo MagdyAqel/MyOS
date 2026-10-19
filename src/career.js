@@ -58,8 +58,26 @@ export const OPERATIONS = [
     id: "horizon",
     stage: 3,
     mission: "assault",
-    title: "الأفق الأخير",
-    story: "وصلت إحداثيات القيادة المغمورة. قد أسطولك إلى المهمة الأخيرة.",
+    title: "أفق الأعماق",
+    story: "وصلت إحداثيات القيادة المغمورة. حيّدها لفتح طريق الاستطلاع الأخير.",
+  },
+  {
+    id: "small-eye",
+    stage: 1,
+    map: "watchtower",
+    mission: "recon",
+    title: "عين فوق الحدود",
+    story:
+      "اختر منطقة المراقبة شرق الخريطة. أبقِ طائرة الاستطلاع قرب الدائرة عشر ثوانٍ مع تجنب الدفاعات.",
+  },
+  {
+    id: "long-horizon",
+    stage: 0,
+    map: "fireline",
+    mission: "siege",
+    title: "مدى الأفق",
+    story:
+      "انقل المشاة بالناقلات لحماية المدفعية. اكشف قيادة الخصم جوًا ثم اقصفها من خارج مدى دفاعاتها.",
   },
 ];
 export const UPGRADE_NAMES = {
@@ -71,10 +89,10 @@ export function parseCareer(raw) {
   const d = typeof raw === "string" ? JSON.parse(raw) : raw;
   if (
     !d ||
-    d.completed?.length > 8 ||
+    d.completed?.length > OPERATIONS.length ||
     (d.reports &&
       (!Array.isArray(d.reports) ||
-        d.reports.length > 8 ||
+        d.reports.length > OPERATIONS.length ||
         d.reports.some(
           (r) =>
             !r ||
@@ -134,7 +152,7 @@ export function awardOperation(career, battle) {
   career.reports = [
     { id: op.id, time: Math.round(battle.time), ...battle.stats },
     ...(career.reports || []),
-  ].slice(0, 8);
+  ].slice(0, OPERATIONS.length);
   return true;
 }
 export function buyUpgrade(career, key) {

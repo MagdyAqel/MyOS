@@ -1,5 +1,7 @@
 import { bindNetworkGame } from "./network-game.js";
 import { setupCommandCenter } from "./command-center.js";
+import { setupUnitControls } from "./unit-controls.js";
+import { specialAction } from "./unit-abilities.js";
 import { Battle, TYPES } from "./battle.js";
 import { STAGES, loadCampaign } from "./campaign.js";
 import { createBattleScene } from "./scene3d.js";
@@ -18,6 +20,7 @@ import {
   BATTLE_AUTO,
 } from "./battle-save.js";
 import "./features.css";
+import "./battle-layout.css";
 
 export function setupGame(content, { network = null } = {}) {
   let storage;
@@ -43,7 +46,7 @@ export function setupGame(content, { network = null } = {}) {
   }
   content.innerHTML = `<div class="rts-app">
     <header class="rts-header"><div><span class="eyebrow">COMMAND HORIZON · 3D</span><strong>قيادة الأفق</strong></div><div class="rts-stats" aria-live="off"><span data-stat="cash"></span><span data-stat="wave"></span><span data-stat="army"></span></div><div class="sound-controls"><button data-sound="toggle" aria-pressed="false">تشغيل الأصوات</button><label>الصوت <input type="range" min="0" max="100" aria-label="مستوى صوت اللعبة" value="${Math.round(audio.volume * 100)}"></label></div><button data-game="pause">إيقاف مؤقت</button><button data-game="restart">إعادة المرحلة</button></header>
-    <div class="campaign-bar" id="game-maps"><label>المراحل <select aria-label="اختيار المرحلة">${STAGES.map((s, i) => `<option value="${i}">${i + 1}. ${s.name} — ${s.category}</option>`).join("")}</select></label><label>الخريطة <select aria-label="اختيار الخريطة"></select></label><label>المهمة <select aria-label="نوع المهمة"></select></label><label>الصعوبة <select aria-label="مستوى الصعوبة">${Object.entries(
+    <div class="campaign-bar" id="game-maps"><label>بيئة التدريب <select aria-label="اختيار المرحلة">${STAGES.map((s, i) => `<option value="${i}">${i + 1}. ${s.name} — ${s.category}</option>`).join("")}</select></label><label>الخريطة <select aria-label="اختيار الخريطة"></select></label><label>المهمة <select aria-label="نوع المهمة"></select></label><label>الصعوبة <select aria-label="مستوى الصعوبة">${Object.entries(
       DIFFICULTIES,
     )
       .map(
@@ -119,7 +122,8 @@ export function setupGame(content, { network = null } = {}) {
     }
   }
   let networkUI;
-  let tacticalUI,
+  let unitUI,
+    tacticalUI,
     orderIntent = null,
     qualityChoice = "auto";
   try {
@@ -193,6 +197,7 @@ export function setupGame(content, { network = null } = {}) {
       battle.entities.filter((e) => battle.isVisible(e)),
       battle.selected,
       view?.cameraTarget(),
+      battle.mission.id,
     );
     text(content.querySelector('[data-stat="cash"]'), `$${battle.cash}`);
     text(
@@ -259,6 +264,7 @@ export function setupGame(content, { network = null } = {}) {
         progress.completed.push(battle.stageIndex);
       saveProgress();
     }
+    unitUI?.refresh();
     networkUI?.hud();
   }
   function start(index, mapId = chosenMaps[index], restored = null, run = {}) {
@@ -332,7 +338,12 @@ export function setupGame(content, { network = null } = {}) {
     content.querySelectorAll("[data-train]").forEach(
       (b) =>
         (b.onclick = () => {
-          battle.purchase(b.dataset.train);
+          battle.purchase(
+            b.dataset.train,
+            undefined,
+            undefined,
+            unitUI?.design(),
+          );
           refresh();
         }),
     );
@@ -418,7 +429,16 @@ export function setupGame(content, { network = null } = {}) {
     const rect = minimap.querySelector("svg").getBoundingClientRect(),
       x = ((event.clientX - rect.left) / rect.width) * 1000,
       y = ((event.clientY - rect.top) / rect.height) * 620;
-    if (event.shiftKey) battle.command(x, y);
+    if (event.shiftKey && orderIntent === "recon") {
+      if (
+        specialAction(battle, {
+          kind: "recon",
+          x: Math.max(20, Math.min(980, x)),
+          y: Math.max(20, Math.min(595, y)),
+        })
+      )
+        orderIntent = null;
+    } else if (event.shiftKey) battle.command(x, y);
     else view.focusPoint(x, y);
     refresh();
   };
@@ -476,6 +496,15 @@ export function setupGame(content, { network = null } = {}) {
     if (hq) {
       battle.commandMode = "move";
       battle.command(hq.x, hq.y);
+      if (
+        !network &&
+        !battle.isVisible(hq) &&
+        battle.selected.size &&
+        !battle.paused &&
+        battle.status === "playing"
+      )
+        battle.message =
+          "أمر هجوم: تتقدم الوحدات لاستكشاف موضع القيادة قبل الاشتباك";
     }
     refresh();
   };
@@ -598,6 +627,18 @@ export function setupGame(content, { network = null } = {}) {
     event.preventDefault();
     const point = view.pick(event);
     if (!point) return;
+    if (orderIntent === "recon") {
+      if (
+        specialAction(battle, {
+          kind: "recon",
+          x: Math.max(20, Math.min(980, point.x)),
+          y: Math.max(20, Math.min(595, point.y)),
+        })
+      )
+        orderIntent = null;
+      refresh();
+      return;
+    }
     if (orderIntent === "rally") {
       if (network) {
         networkUI.request({ kind: "rally", x: point.x, y: point.y });
@@ -686,6 +727,50 @@ export function setupGame(content, { network = null } = {}) {
       building = null;
     },
   });
+  unitUI = setupUnitControls(content, {
+    getBattle: () => battle,
+    refresh,
+    arm: (value) => {
+      orderIntent = value;
+      building = null;
+    },
+  });
+  const info = document.createElement("details");
+  info.className = "battlefield-info";
+  info.innerHTML = "<summary>الخريطة وهدف المهمة</summary>";
+  for (const selector of [".map-preview", ".rts-mission", ".rts-help"])
+    info.append(content.querySelector(selector));
+  content.querySelector(".rts-panel").append(info);
+  const sidebar = content.querySelector(".rts-panel"),
+    jumps = document.createElement("nav");
+  jumps.className = "panel-jumps";
+  jumps.setAttribute("aria-label", "أقسام لوحة القيادة");
+  for (const [selector, name] of [
+    [".build-buttons", "البناء"],
+    [".train-buttons", "الوحدات"],
+    [".unit-abilities", "النقل"],
+    [".command-center", "القيادة"],
+    [".battlefield-info", "الخريطة"],
+  ]) {
+    const button = document.createElement("button");
+    button.textContent = name;
+    button.dataset.panelJump = name;
+    button.onclick = () => {
+      const target = sidebar.querySelector(selector);
+      if (target === info) info.open = true;
+      sidebar.scrollTo({
+        top:
+          sidebar.scrollTop +
+          target.getBoundingClientRect().top -
+          sidebar.getBoundingClientRect().top -
+          jumps.offsetHeight -
+          14,
+        behavior: "smooth",
+      });
+    };
+    jumps.append(button);
+  }
+  sidebar.prepend(jumps);
   const qualitySelect = content.querySelector('[aria-label="جودة الرسومات"]');
   qualitySelect.value = ["auto", "low", "medium", "high"].includes(
     qualityChoice,

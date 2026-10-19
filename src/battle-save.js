@@ -8,6 +8,7 @@ import {
 import { Battle, TYPES } from "./battle.js";
 import { mapFor } from "./maps.js";
 import { DIFFICULTIES, MISSIONS } from "./systems.js";
+import { APC_DESIGNS } from "./unit-abilities.js";
 export const BATTLE_MANUAL = "myos-battle-manual-v1",
   BATTLE_AUTO = "myos-battle-auto-v1";
 const number = (v, max = 1e8) =>
@@ -34,6 +35,10 @@ export function snapshotBattle(b) {
     explored: [...b.explored],
     selected: [...b.selected],
     entities: b.entities.map((e) => ({
+      design: e.design,
+      carriedBy: e.carriedBy,
+      boarding: e.boarding,
+      recon: e.recon,
       ...snapshotUnitTactics(e),
       id: e.id,
       type: e.type,
@@ -53,6 +58,7 @@ export function snapshotBattle(b) {
           : { x: e.order.x, y: e.order.y }
         : null,
     })),
+    shells: b.shells.map((s) => ({ ...s })),
   };
 }
 export function restoreBattle(raw) {
@@ -107,6 +113,8 @@ export function restoreBattle(raw) {
     if (
       !e ||
       !Object.hasOwn(TYPES, e.type) ||
+      (e.design !== undefined &&
+        (e.type !== "apc" || !Object.hasOwn(APC_DESIGNS, e.design))) ||
       !["blue", "red", "neutral"].includes(e.team) ||
       !Number.isInteger(e.id) ||
       e.id < 1 ||
@@ -117,7 +125,9 @@ export function restoreBattle(raw) {
       !number(
         e.hp,
         Math.round(
-          TYPES[e.type].hp *
+          (e.type === "apc"
+            ? APC_DESIGNS[e.design || "standard"].hp
+            : TYPES[e.type].hp) *
             (1 + (e.team === "blue" ? data.upgrades?.armor || 0 : 0) * 0.1),
         ),
       ) ||
@@ -138,6 +148,51 @@ export function restoreBattle(raw) {
   }
   if (data.explored.some((n) => !Number.isInteger(n) || n < 0 || n >= 1000))
     throw Error("بيانات رؤية غير صالحة");
+  for (const e of data.entities) {
+    for (const key of ["carriedBy", "boarding"])
+      if (e[key] !== undefined) {
+        const apc = data.entities.find(
+          (a) => a.id === e[key] && a.type === "apc" && a.team === e.team,
+        );
+        if (
+          e.type !== "soldier" ||
+          !Number.isInteger(e[key]) ||
+          !apc ||
+          (e.carriedBy && e.boarding)
+        )
+          throw Error("ركاب ناقلة غير صالحين");
+      }
+    if (
+      e.type === "apc" &&
+      data.entities.filter((a) => a.carriedBy === e.id || a.boarding === e.id)
+        .length > APC_DESIGNS[e.design || "standard"].capacity
+    )
+      throw Error("تجاوز سعة الناقلة");
+    if (
+      e.recon &&
+      (e.type !== "recon" ||
+        !number(e.recon.x, 1000) ||
+        !number(e.recon.y, 620))
+    )
+      throw Error("منطقة استطلاع غير صالحة");
+  }
+  if (
+    data.shells !== undefined &&
+    (!Array.isArray(data.shells) ||
+      data.shells.length > 180 ||
+      data.shells.some(
+        (s) =>
+          !s ||
+          !["blue", "red"].includes(s.team) ||
+          !["x", "tx"].every((k) => number(s[k], 1000)) ||
+          !["y", "ty"].every((k) => number(s[k], 620)) ||
+          !number(s.damage, 500) ||
+          !number(s.duration, 5) ||
+          s.duration <= 0 ||
+          !number(s.remaining, s.duration),
+      ))
+  )
+    throw Error("قذائف غير صالحة");
   const b = new Battle(data.stage, data.map, {
     difficulty: data.difficulty,
     mission: data.mission,
@@ -148,7 +203,10 @@ export function restoreBattle(raw) {
   b.entities = [];
   b.nextId = 1;
   for (const e of data.entities) {
-    const entity = b.add(e.type, e.team, e.x, e.y);
+    const entity = b.add(e.type, e.team, e.x, e.y, e.design);
+    if (e.carriedBy !== undefined) entity.carriedBy = e.carriedBy;
+    if (e.boarding !== undefined) entity.boarding = e.boarding;
+    if (e.recon) entity.recon = { x: e.recon.x, y: e.recon.y };
     restoreUnitTactics(entity, e);
     entity.id = e.id;
     entity.hp = e.hp;
@@ -197,11 +255,21 @@ export function restoreBattle(raw) {
   b.explored = new Set(data.explored);
   b.selected = new Set(
     data.selected.filter((id) =>
-      b.entities.some((e) => e.id === id && e.team === "blue" && e.speed),
+      b.entities.some((e) => e.id === id && e.team === "blue" && e.speed && !e.carriedBy),
     ),
   );
   b.events = [];
   b.effects = [];
+  b.shells = (data.shells || []).map((s) => ({
+    team: s.team,
+    x: s.x,
+    y: s.y,
+    tx: s.tx,
+    ty: s.ty,
+    damage: s.damage,
+    duration: s.duration,
+    remaining: s.remaining,
+  }));
   b.paused = true;
   b.message = "استُعيدت المعركة. اضغط متابعة للعب.";
   if (

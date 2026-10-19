@@ -1,5 +1,6 @@
 import { blocked } from "./maps.js";
 import { moveUnit } from "./navigation.js";
+import { visionRadius } from "./unit-abilities.js";
 export const DIFFICULTIES = {
   easy: { name: "سهل", income: 0.8, decision: 16, cap: 8 },
   normal: { name: "متوسط", income: 1, decision: 12, cap: 12 },
@@ -11,6 +12,20 @@ export const MISSIONS = [
     name: "تدمير القيادة",
     stages: [0, 1, 2, 3],
     description: "دمّر مقر العدو واحمِ مقرّك.",
+  },
+  {
+    id: "recon",
+    name: "عين السماء",
+    stages: [0, 1, 2],
+    description:
+      "أرسل طائرة استطلاع إلى الدائرة شرق الخريطة، واستطلعها لمدة 10 ثوانٍ مع حماية القيادة.",
+  },
+  {
+    id: "siege",
+    name: "كسر الحصار",
+    stages: [0],
+    description:
+      "استطلع الهدف ثم دمّر مقر العدو؛ المدفعية تضرب من مسافة بعيدة وتحتاج حماية من الاقتراب.",
   },
   {
     id: "escort",
@@ -100,27 +115,21 @@ export function initializeSystems(b, options = {}) {
   updateExploration(b);
 }
 export function visibleTo(b, entity, team = "blue") {
+  if (entity.carriedBy) return entity.team === team;
+  if (entity.hp <= 0) return false;
   if (!b.fog || entity.team === team || entity.team === "neutral") return true;
   return b.entities.some(
     (unit) =>
       unit.team === team &&
       unit.hp > 0 &&
-      distance(unit, entity) <
-        (unit.domain === "air"
-          ? 340
-          : unit.type === "hq"
-            ? 280
-            : unit.speed
-              ? 230
-              : 190),
+      distance(unit, entity) < visionRadius(unit),
   );
 }
 export function updateExploration(b) {
   if (b.time < b.nextExplore) return;
   b.nextExplore = b.time + 0.6;
   for (const e of b.entities.filter((e) => e.team === "blue")) {
-    const radius =
-      e.domain === "air" ? 340 : e.type === "hq" ? 280 : e.speed ? 230 : 190;
+    const radius = visionRadius(e);
     for (
       let y = Math.max(0, Math.floor((e.y - radius) / 25));
       y < Math.min(25, Math.ceil((e.y + radius) / 25));
@@ -207,7 +216,13 @@ export function updateEnemy(b, types) {
     const seenHQ = enemies.find((e) => e.type === "hq");
     if (seenHQ) enemy.lastHQ = { x: seenHQ.x, y: seenHQ.y };
     for (const unit of b.entities.filter(
-      (e) => e.team === "red" && e.speed && e.damage && !e.servicing,
+      (e) =>
+        e.team === "red" &&
+        e.speed &&
+        e.damage &&
+        !e.servicing &&
+        !e.carriedBy &&
+        !e.boarding,
     )) {
       const role = unit.id % 3;
       let target = enemies.find(
@@ -247,6 +262,9 @@ export function updateEnemy(b, types) {
   }
 }
 export function serviceUnit(b, unit) {
+  if (unit.carriedBy) return;
+  delete unit.boarding;
+  delete unit.recon;
   const bases = b.entities.filter(
     (e) =>
       e.team === unit.team &&
@@ -261,7 +279,9 @@ export function serviceUnit(b, unit) {
   unit.route = null;
 }
 export function updateLogistics(b, dt) {
-  for (const unit of b.entities.filter((e) => e.speed && e.damage)) {
+  for (const unit of b.entities.filter(
+    (e) => e.speed && e.damage && e.hp > 0 && !e.carriedBy,
+  )) {
     if (
       (unit.ammo === 0 ||
         (unit.team === "red" && unit.hp < unit.maxHp * 0.25)) &&
@@ -298,6 +318,17 @@ export function updateLogistics(b, dt) {
   }
 }
 export function advanceMission(b, dt) {
+  if (
+    b.mission.id === "recon" &&
+    b.entities.some(
+      (e) =>
+        e.team === "blue" &&
+        e.type === "recon" &&
+        e.hp > 0 &&
+        distance(e, { x: 820, y: 470 }) < 100,
+    )
+  )
+    b.objective.hold += dt;
   if (b.mission.id === "escort") {
     const convoy = b.entities.find((e) => e.type === "convoy" && e.hp > 0);
     if (convoy) moveUnit(convoy, { x: 850, y: 540 }, b.map, dt);
@@ -344,6 +375,7 @@ export function advanceMission(b, dt) {
   }
 }
 export function missionOutcome(b) {
+  if (b.mission.id === "recon") return b.objective.hold >= 10 ? "won" : null;
   if (b.mission.id === "escort") {
     const convoy = b.entities.find((e) => e.type === "convoy");
     return !convoy ? "lost" : convoy.x > 830 ? "won" : null;
@@ -364,6 +396,8 @@ export function missionOutcome(b) {
 }
 export function missionStatus(b) {
   return {
+    recon: `استطلاع المنطقة الشرقية: ${Math.min(10, Math.floor(b.objective.hold))}/10 ث`,
+    siege: "اكشف القيادة ثم حاصرها بالمدفعية",
     assault: "الهدف: تدمير القيادة",
     escort: "احمِ القافلة حتى تصل شرقًا",
     rescue: `فرق الإخلاء: ${b.objective.evacuated}/3`,

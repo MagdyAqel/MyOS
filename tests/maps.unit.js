@@ -4,10 +4,10 @@ import { MAPS, mapFor, blocked } from "../src/maps.js";
 import { findRoute, moveUnit, walkable, clearShot } from "../src/navigation.js";
 import { Battle } from "../src/battle.js";
 import { cueForUnit, loadSoundSettings } from "../src/audio.js";
-test("eight distinct maps are assigned to their own campaign stages", () => {
-  assert.equal(new Set(MAPS.map((m) => m.id)).size, 8);
+test("ten distinct maps are assigned to their own campaign environments", () => {
+  assert.equal(new Set(MAPS.map((m) => m.id)).size, 10);
   for (let stage = 0; stage < 4; stage++) {
-    assert.equal(MAPS.filter((m) => m.stage === stage).length, 2);
+    assert.equal(MAPS.filter((m) => m.stage === stage).length, stage < 2 ? 3 : 2);
     assert.equal(mapFor(stage, "bad").stage, stage);
   }
 });

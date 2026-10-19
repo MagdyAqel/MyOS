@@ -60,6 +60,21 @@ test("two separate browsers join a private room, command their own armies and re
     await expect(page.locator("[data-game=save]")).toBeDisabled();
     await expect(page.locator("[data-game=pause]")).toBeDisabled();
   }
+  await host.locator("[data-build=factory]").click();
+  await host.locator("[data-game=autoplace]").click();
+  await host
+    .getByRole("combobox", { name: "تصميم ناقلة الجند" })
+    .selectOption("armored");
+  await host.locator("[data-train=apc]").click();
+  await expect(host.locator("[data-stat=cash]")).toHaveText("$700");
+  await host.locator("[data-select-type=soldier]").click();
+  await host.locator("[data-ability=board]").click();
+  await expect(host.locator(".unit-status")).toContainText("داخل الناقلات: 2", {
+    timeout: 10000,
+  });
+  await expect(host.locator(".unit-status")).toContainText("المحدد: 0");
+  await host.locator("[data-ability=unload]").click();
+  await expect(host.locator(".unit-status")).toContainText("داخل الناقلات: 0");
   await host.locator("[data-tactic=suggest-hq]").click();
   await expect(host.locator(".hq-status")).toContainText(/تجهيز|يتحرك/);
   expect(await host.evaluate(() => localStorage.getItem("myos-note"))).toBe(

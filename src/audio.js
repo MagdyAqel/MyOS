@@ -2,6 +2,9 @@ export function cueForUnit(type) {
   return (
     {
       soldier: "rifle",
+      apc: "rifle",
+      artillery: "naval",
+      drone: "bomb",
       tank: "cannon",
       turret: "missile",
       fighter: "missile",

@@ -52,7 +52,7 @@ export function issueTacticalOrder(b, kind, x, y) {
   const team = b.actorTeam || "blue";
   if (b.paused || b.status !== "playing") return false;
   const units = b.entities.filter(
-    (e) => b.selected.has(e.id) && e.damage && e.speed && e.team === team,
+    (e) => b.selected.has(e.id) && e.speed && !e.carriedBy && e.team === team,
   );
   if (!units.length) {
     b.message = "حدّد وحدات قتالية أولًا";
@@ -61,7 +61,13 @@ export function issueTacticalOrder(b, kind, x, y) {
   const target =
     kind === "guard"
       ? b.entities
-          .filter((e) => e.team === team && !b.selected.has(e.id))
+          .filter(
+            (e) =>
+              e.team === team &&
+              !e.carriedBy &&
+              e.hp > 0 &&
+              !b.selected.has(e.id),
+          )
           .sort((a, c) => dist(a, { x, y }) - dist(c, { x, y }))[0]
       : null;
   if (kind === "guard" && (!target || dist(target, { x, y }) > 65)) {
@@ -70,6 +76,8 @@ export function issueTacticalOrder(b, kind, x, y) {
   }
   units.forEach((e, i) => {
     e.servicing = false;
+    delete e.boarding;
+    delete e.recon;
     e.route = null;
     const destination = formationPoint(b, i, units.length, x, y);
     const point = b.constrain(e, destination.x, destination.y);
@@ -199,7 +207,7 @@ export function updateTactics(b, dt) {
       );
       e.domain = e.depth > 0.55 ? "sub" : "sea";
     }
-    if (e.type === "fighter" || e.type === "bomber") {
+    if (e.domain === "air") {
       const landing =
         e.servicing &&
         b.entities.some(
@@ -237,7 +245,8 @@ export function updateTactics(b, dt) {
 export function saveGroup(b, slot) {
   const ids = b.entities
     .filter(
-      (e) => e.team === "blue" && e.speed && e.damage && b.selected.has(e.id),
+      (e) =>
+        e.team === "blue" && e.speed && !e.carriedBy && b.selected.has(e.id),
     )
     .map((e) => e.id);
   if (!ids.length) {
@@ -250,7 +259,7 @@ export function saveGroup(b, slot) {
 export function selectGroup(b, slot) {
   b.selected = new Set(
     (b.groups[slot] || []).filter((id) =>
-      b.entities.some((e) => e.id === id && e.hp > 0),
+      b.entities.some((e) => e.id === id && e.hp > 0 && !e.carriedBy),
     ),
   );
   b.message = `تم تحديد المجموعة ${slot}`;

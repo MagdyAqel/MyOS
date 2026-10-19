@@ -41,7 +41,7 @@ test('air mission deploys aircraft with distinct targeting and playable reinforc
 test('naval deployment stays on water, and submarines cannot fire at ground headquarters',()=>{
  const b=new Battle(2);const sub=b.entities.find(e=>e.type==='submarine');
  b.selected=new Set([sub.id]);b.command(500,30);advance(b,5);assert.ok(sub.y>=285);
- const hq=b.entities.find(e=>e.type==='hq'&&e.team==='red');b.command(hq.x,hq.y);assert.match(b.message,/لا تستطيع/);
+ const hq=b.entities.find(e=>e.type==='hq'&&e.team==='red');b.fog=false;b.command(hq.x,hq.y);assert.match(b.message,/لا تستطيع/);
  assert.equal(b.purchase('harbor',400,400),false);assert.equal(b.purchase('power',320,450),false);
  assert.equal(b.purchase('destroyer'),true);const ship=b.entities.at(-1);assert.ok(ship.y>=285);
 });

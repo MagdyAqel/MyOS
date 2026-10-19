@@ -1,4 +1,5 @@
 import { detailModel, QUALITY, resolveQuality } from "./model-details.js";
+import { specialModel } from "./special-models.js";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { mapFor } from "./maps.js";
@@ -253,7 +254,9 @@ export function createBattleScene(
       light = e.team === "blue" ? "#93deed" : "#ffc89f",
       dark = "#263640";
     g.userData.entityId = e.id;
-    if (e.type === "fighter" || e.type === "bomber") {
+    if (specialModel(g, e, { box, cylinder, mesh }, color, light, dark)) {
+      // The special unit supplies its own hull and equipment.
+    } else if (e.type === "fighter" || e.type === "bomber") {
       const big = e.type === "bomber";
       const fuselage = mesh(
         new THREE.ConeGeometry(big ? 7 : 5, big ? 48 : 42, 10),
@@ -421,6 +424,30 @@ export function createBattleScene(
   box(rallyFlag, 20, 13, 1, "#55bd85", 10, 39, 0);
   scene.add(rallyFlag);
   rallyFlag.visible = false;
+  const reconArea = new THREE.Mesh(
+    new THREE.RingGeometry(107, 110, 64),
+    new THREE.MeshBasicMaterial({
+      color: 0x81e7cd,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.8,
+      depthWrite: false,
+    }),
+  );
+  reconArea.rotation.x = -Math.PI / 2;
+  scene.add(reconArea);
+  const objectiveArea = new THREE.Mesh(
+    new THREE.RingGeometry(95, 100, 64),
+    new THREE.MeshBasicMaterial({
+      color: 0xf2ce79,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    }),
+  );
+  objectiveArea.rotation.x = -Math.PI / 2;
+  objectiveArea.position.set(320, 4, 160);
+  scene.add(objectiveArea);
+  const shellModels = [];
   const effectGeo = new THREE.BufferGeometry();
   const effectPositions = new THREE.Float32BufferAttribute(
     new Float32Array(3072),
@@ -452,6 +479,34 @@ export function createBattleScene(
           : 0;
   }
   function draw(battle) {
+    const scout = battle.entities.find(
+      (e) =>
+        e.type === "recon" && battle.selected.has(e.id) && e.team === "blue",
+    );
+    reconArea.visible = Boolean(scout);
+    if (scout) reconArea.position.set(scout.x - 500, 4, scout.y - 310);
+    objectiveArea.visible = battle.mission.id === "recon";
+    while (shellModels.length < battle.shells.length) {
+      const projectile = mesh(
+        new THREE.SphereGeometry(2.8, 6, 4),
+        "#ffcb76",
+        scene,
+      );
+      shellModels.push(projectile);
+    }
+    for (let i = 0; i < shellModels.length; i++) {
+      const shell = battle.shells[i],
+        model = shellModels[i];
+      model.visible = Boolean(shell);
+      if (shell) {
+        const t = 1 - shell.remaining / shell.duration;
+        model.position.set(
+          shell.x + (shell.tx - shell.x) * t - 500,
+          20 + Math.sin(Math.PI * t) * 150,
+          shell.y + (shell.ty - shell.y) * t - 310,
+        );
+      }
+    }
     const w = Math.max(1, canvas.clientWidth),
       h = Math.max(1, canvas.clientHeight);
     if (w !== lastWidth || h !== lastHeight) {
@@ -481,9 +536,10 @@ export function createBattleScene(
       }
     for (const e of battle.entities) {
       const g = models.get(e.id) || createModel(e);
-      g.visible = battle.isVisible ? battle.isVisible(e) : true;
+      g.visible =
+        !e.carriedBy && (battle.isVisible ? battle.isVisible(e) : true);
       const height =
-        e.type === "fighter" || e.type === "bomber"
+        e.domain === "air"
           ? 8 + (e.flight ?? 1) * (flightHeight - 8)
           : e.type === "submarine"
             ? underwater
@@ -499,6 +555,7 @@ export function createBattleScene(
       g.userData.ring.visible = battle.selected.has(e.id);
       g.userData.hp.scale.x = Math.max(0.01, e.hp / e.maxHp);
       g.userData.detail.update(e, battle.time, quality);
+      if (g.userData.rotor) g.userData.rotor.rotation.z = battle.time * 35;
       if (g.userData.weaponPivot)
         g.userData.weaponPivot.rotation.y =
           (e.aim ?? e.heading ?? g.rotation.y) - g.rotation.y;
@@ -592,6 +649,8 @@ export function createBattleScene(
     });
     for (const m of materials.values()) m.dispose();
     effectMat.dispose();
+    reconArea.material.dispose();
+    objectiveArea.material.dispose();
     grid.material.dispose();
     water?.material.dispose();
     for (const model of models.values()) {

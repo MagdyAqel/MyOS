@@ -1,6 +1,7 @@
 import { Battle } from "../src/battle.js";
 import { snapshotBattle, restoreBattle } from "../src/battle-save.js";
 import { MAPS } from "../src/maps.js";
+import { specialAction, visionRadius } from "../src/unit-abilities.js";
 import {
   FORMATIONS,
   relocateHQ,
@@ -73,11 +74,14 @@ export class RoomCore {
         "suggestHQ",
         "depth",
         "rally",
+        "board",
+        "unload",
+        "recon",
       ].includes(action.kind)
     )
       throw Error("أمر غير مسموح");
     if (
-      ["relocate", "rally", "command"].includes(action.kind) &&
+      ["relocate", "rally", "command", "recon"].includes(action.kind) &&
       (!Number.isFinite(action.x) ||
         !Number.isFinite(action.y) ||
         action.x < 0 ||
@@ -93,6 +97,11 @@ export class RoomCore {
         action.selected.some((id) => !Number.isInteger(id)))
     )
       throw Error("تحديد غير صالح");
+    if (
+      action.carrier !== undefined &&
+      (!Number.isInteger(action.carrier) || action.carrier < 1)
+    )
+      throw Error("ناقلة غير صالحة");
     const own = this.settings[team];
     if (action.formation !== undefined) {
       if (!Object.hasOwn(FORMATIONS, action.formation))
@@ -111,7 +120,7 @@ export class RoomCore {
     b.selected = new Set(
       (action.selected || []).filter((id) =>
         b.entities.some(
-          (e) => e.id === id && e.team === team && e.speed && e.damage,
+          (e) => e.id === id && e.team === team && e.speed && !e.carriedBy,
         ),
       ),
     );
@@ -125,7 +134,7 @@ export class RoomCore {
         )
           throw Error("لا يمكن إضافة وحدات أو مبانٍ أخرى");
         if (action.kind === "purchase")
-          ok = b.purchase(action.unit, action.x, action.y);
+          ok = b.purchase(action.unit, action.x, action.y, action.design);
         else {
           ok = false;
           const ys =
@@ -143,6 +152,8 @@ export class RoomCore {
                 break outer;
               }
         }
+      } else if (["board", "unload", "recon"].includes(action.kind)) {
+        ok = specialAction(b, action);
       } else if (action.kind === "command") {
         if (!b.selected.size) return { ok: false, text: "حدد وحداتك أولًا" };
         b.command(action.x, action.y);
@@ -175,8 +186,7 @@ export class RoomCore {
     this.battle.update(dt);
     const b = this.battle;
     for (const e of b.entities.filter((e) => e.team === "red")) {
-      const r =
-        e.domain === "air" ? 340 : e.type === "hq" ? 280 : e.speed ? 230 : 190;
+      const r = visionRadius(e);
       for (
         let y = Math.max(0, Math.floor((e.y - r) / 25));
         y < Math.min(25, Math.ceil((e.y + r) / 25));
@@ -204,9 +214,14 @@ export class RoomCore {
           team,
         ),
     );
+    data.shells = data.shells.filter(
+      (s) =>
+        s.team === team || b.isVisible({ x: s.x, y: s.y, team: s.team }, team),
+    );
     if (team === "red") {
       for (const e of data.entities)
         e.team = e.team === "red" ? "blue" : e.team === "blue" ? "red" : e.team;
+      for (const s of data.shells) s.team = s.team === "red" ? "blue" : "red";
       data.cash = b.enemy.cash;
       data.status =
         b.status === "won" ? "lost" : b.status === "lost" ? "won" : b.status;

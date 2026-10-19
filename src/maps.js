@@ -109,6 +109,34 @@ export const MAPS = [
       { x: 690, y: 150, r: 47, h: 66 },
     ],
   },
+  {
+    id: "fireline",
+    stage: 0,
+    name: "خط المدى",
+    seed: 97,
+    description:
+      "هضاب جانبية وممر للقوات؛ اكشف الهدف بالاستطلاع لتوجيه المدفعية بعيدة المدى.",
+    sky: "#c8c3ad",
+    ground: "#b59770",
+    obstacles: [
+      { x: 460, y: 125, r: 65, h: 90 },
+      { x: 580, y: 490, r: 70, h: 95 },
+    ],
+  },
+  {
+    id: "watchtower",
+    stage: 1,
+    name: "مرصد الحدود",
+    seed: 101,
+    description:
+      "منطقة استطلاع صغيرة في الجنوب الشرقي؛ تجنب موقع الدفاع وسط الممر.",
+    sky: "#aabcc8",
+    ground: "#778674",
+    obstacles: [
+      { x: 510, y: 150, r: 74, h: 110 },
+      { x: 590, y: 480, r: 55, h: 85 },
+    ],
+  },
 ];
 export function mapFor(stage, id) {
   return (
@@ -126,8 +154,25 @@ export function seededRandom(seed) {
 export function blocked(map, x, y, radius = 0) {
   return map.obstacles.some((o) => Math.hypot(x - o.x, y - o.y) < o.r + radius);
 }
-export function mapSvg(map, entities = [], selected = new Set(), focus = null) {
+export function mapSvg(
+  map,
+  entities = [],
+  selected = new Set(),
+  focus = null,
+  mission = null,
+) {
+  entities = entities.filter((e) => !e.carriedBy);
   const water = map.stage >= 2;
   const color = map.stage === 3 ? "#163a4b" : water ? "#276d83" : map.ground;
-  return `<svg viewBox="0 0 1000 620" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect width="1000" height="620" fill="${color}"/>${map.stage === 2 ? '<rect width="1000" height="260" fill="#c9b78b"/>' : ""}<path d="M560 0V620" stroke="#ffffff35" stroke-dasharray="14 12" stroke-width="3"/>${map.obstacles.map((o) => `<circle cx="${o.x}" cy="${o.y}" r="${o.r}" fill="${water ? "#8f9173" : "#685c4c"}" stroke="#ffffff30" stroke-width="4"/>`).join("")}${entities.map((e) => `<circle cx="${e.x}" cy="${e.y}" r="${e.type === "hq" ? 23 : e.speed ? 9 : 14}" fill="${e.team === "blue" ? "#5dd6ff" : "#ff816b"}" ${selected.has(e.id) ? 'stroke="#ffef93" stroke-width="7"' : ""}/>`).join("")}${focus ? `<circle cx="${focus.x}" cy="${focus.y}" r="75" fill="none" stroke="#fff" stroke-width="4" opacity=".7"/>` : ""}</svg>`;
+  return `<svg viewBox="0 0 1000 620" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect width="1000" height="620" fill="${color}"/>${map.stage === 2 ? '<rect width="1000" height="260" fill="#c9b78b"/>' : ""}<path d="M560 0V620" stroke="#ffffff35" stroke-dasharray="14 12" stroke-width="3"/>${map.obstacles.map((o) => `<circle cx="${o.x}" cy="${o.y}" r="${o.r}" fill="${water ? "#8f9173" : "#685c4c"}" stroke="#ffffff30" stroke-width="4"/>`).join("")}${mission === "recon" ? '<circle cx="820" cy="470" r="100" fill="none" stroke="#f2ce79" stroke-width="6"/>' : ""}${entities
+    .filter(
+      (e) => e.type === "recon" && e.team === "blue" && selected.has(e.id),
+    )
+    .map(
+      (e) =>
+        `<circle cx="${e.x}" cy="${e.y}" r="110" fill="none" stroke="#81e7cd" stroke-width="4"/>`,
+    )
+    .join(
+      "",
+    )}${entities.map((e) => `<circle cx="${e.x}" cy="${e.y}" r="${e.type === "hq" ? 23 : e.speed ? 9 : 14}" fill="${e.team === "blue" ? "#5dd6ff" : "#ff816b"}" ${selected.has(e.id) ? 'stroke="#ffef93" stroke-width="7"' : ""}/>`).join("")}${focus ? `<circle cx="${focus.x}" cy="${focus.y}" r="75" fill="none" stroke="#fff" stroke-width="4" opacity=".7"/>` : ""}</svg>`;
 }

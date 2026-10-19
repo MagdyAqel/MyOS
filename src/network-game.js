@@ -38,7 +38,7 @@ export function bindNetworkGame(
       b.paused = data.phase !== "playing";
       b.selected = new Set(
         [...(old?.selected || [])].filter((id) =>
-          b.entities.some((e) => e.id === id && e.team === "blue"),
+          b.entities.some((e) => e.id === id && e.team === "blue" && !e.carriedBy),
         ),
       );
       b.groups = controls.groups;
@@ -69,7 +69,8 @@ export function bindNetworkGame(
         Date.now() < connection.noticeUntil
           ? connection.notice
           : connection.status;
-      b.purchase = (unit, x, y) => request({ kind: "purchase", unit, x, y });
+      b.purchase = (unit, x, y, design) =>
+        request({ kind: "purchase", unit, x, y, design });
       b.command = (x, y) => request({ kind: "command", x, y });
       b.serviceSelected = () => request({ kind: "service" });
       b.requestNetwork = request;
@@ -131,6 +132,10 @@ export function bindNetworkGame(
       if (!b) return;
       const t = Math.min(1, (time - received) / 200);
       if (!b.paused) {
+        const elapsed = Math.min(0.25, (time - received) / 1000);
+        for (const s of b.shells) s.visualRemaining ??= s.remaining;
+        for (const s of b.shells)
+          s.remaining = Math.max(0, s.visualRemaining - elapsed);
         b.time = baseTime + Math.min(0.25, (time - received) / 1000);
         for (const e of b.entities) {
           e.x = e.fromX + (e.toX - e.fromX) * t;

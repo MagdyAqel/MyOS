@@ -44,6 +44,28 @@ test("installed production shell, notes and full game reload offline under /MyOS
   await expect(page.locator(".mission-objective")).toContainText("السيطرة");
   await page.locator('[data-game="save"]').click();
   await expect(page.locator(".battle-save-status")).toContainText("تم حفظ");
+  await page
+    .getByRole("combobox", { name: "اختيار المرحلة", exact: true })
+    .selectOption("0");
+  await page
+    .getByRole("combobox", { name: "نوع المهمة", exact: true })
+    .selectOption("siege");
+  await expect(page.locator("canvas")).toHaveAttribute(
+    "data-renderer",
+    "webgl",
+  );
+  await page.locator("[data-select-type=soldier]").click();
+  await page.locator("[data-ability=board]").click();
+  await expect(page.locator(".unit-status")).toContainText("داخل الناقلات: 2");
+  await page.locator("[data-game=save]").click();
+  expect(
+    await page.evaluate(
+      () =>
+        JSON.parse(
+          localStorage.getItem("myos-battle-manual-v1"),
+        ).entities.filter((e) => e.carriedBy).length,
+    ),
+  ).toBe(2);
   await page.getByRole("button", { name: "إغلاق", exact: true }).click();
   await page.locator("[data-task=writer]").click();
   await page

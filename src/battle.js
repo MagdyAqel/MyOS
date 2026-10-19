@@ -2,6 +2,15 @@ import { STAGES } from "./campaign.js";
 import { mapFor, blocked } from "./maps.js";
 import { moveUnit, clearShot, walkable } from "./navigation.js";
 import {
+  SPECIAL_TYPES,
+  APC_DESIGNS,
+  applyAPCDesign,
+  updateUnitAbility,
+  updatePassengers,
+  advanceShells,
+  recordDamage,
+} from "./unit-abilities.js";
+import {
   EXTRA_TYPES,
   initializeSystems,
   visibleTo,
@@ -24,6 +33,7 @@ export const WIDTH = 1000,
   HEIGHT = 620;
 export const TYPES = {
   ...EXTRA_TYPES,
+  ...SPECIAL_TYPES,
   hq: { name: "مركز القيادة", hp: 1800, radius: 38, domain: "ground" },
   power: {
     name: "محطة طاقة",
@@ -180,6 +190,7 @@ export class Battle {
     this.paused = false;
     this.selected = new Set();
     this.effects = [];
+    this.shells = [];
     this.entities = [];
     this.upgrades = normalizeUpgrades(options.upgrades);
     this.message = this.stage.description;
@@ -210,19 +221,28 @@ export class Battle {
     }
     initializeSystems(this, options);
     initializeTactics(this, options);
+    if (this.mission.id === "recon") this.add("recon", "blue", 200, 450);
+    if (this.mission.id === "siege") {
+      this.add("power", "blue", 75, 75);
+      this.add("factory", "blue", 125, 485);
+      this.add("airfield", "blue", 100, 150);
+      this.add("artillery", "blue", 270, 405);
+      this.add("apc", "blue", 235, 350);
+      this.add("recon", "blue", 235, 460);
+    }
   }
   isVisible(entity, team = "blue") {
     return visibleTo(this, entity, team);
   }
   serviceSelected() {
     for (const unit of this.entities.filter(
-      (e) => this.selected.has(e.id) && e.damage && e.speed,
+      (e) => this.selected.has(e.id) && !e.carriedBy && e.speed,
     ))
       serviceUnit(this, unit);
     this.message =
       "عودة الوحدات للصيانة وإعادة التسليح؛ الإصلاح يستهلك الموارد";
   }
-  add(type, team, x, y) {
+  add(type, team, x, y, design = "standard") {
     const e = {
       ...TYPES[type],
       id: this.nextId++,
@@ -241,8 +261,11 @@ export class Battle {
           bomber: 8,
           destroyer: 24,
           submarine: 12,
-        }[type] || 0,
+        }[type] ||
+        TYPES[type].magazine ||
+        0,
     };
+    if (type === "apc") applyAPCDesign(e, design);
     if (team === "blue") {
       e.hp = e.maxHp = Math.round(e.hp * (1 + this.upgrades.armor * 0.1));
       if (e.damage)
@@ -300,7 +323,7 @@ export class Battle {
       ),
     };
   }
-  purchase(type, x, y) {
+  purchase(type, x, y, design = "standard") {
     const team = this.actorTeam || "blue",
       wallet = team === "blue" ? this : this.enemy;
     if (this.status !== "playing" || this.paused) return false;
@@ -317,6 +340,8 @@ export class Battle {
       this.message = "هذه الوحدة غير متاحة في المرحلة الحالية";
       return false;
     }
+    if (type === "apc" && !Object.hasOwn(APC_DESIGNS, design)) return false;
+    const cost = spec.cost + (type === "apc" ? APC_DESIGNS[design].extra : 0);
     if (spec.needs && !this.has(spec.needs)) {
       this.message = `يتطلب ${TYPES[spec.needs].name} أولًا`;
       return false;
@@ -325,14 +350,13 @@ export class Battle {
       this.message = "تحتاج إلى محطة طاقة";
       return false;
     }
-    if (wallet.cash < spec.cost) {
+    if (wallet.cash < cost) {
       this.message = "الموارد غير كافية";
       return false;
     }
     if (spec.speed) {
       if (
-        this.entities.filter((e) => e.team === team && e.speed && e.damage)
-          .length >= 40
+        this.entities.filter((e) => e.team === team && e.speed).length >= 40
       ) {
         this.message = "الحد الأقصى ٤٠ وحدة";
         return false;
@@ -410,8 +434,8 @@ export class Battle {
         return false;
       }
     }
-    wallet.cash -= spec.cost;
-    const recruited = this.add(type, team, x, y);
+    wallet.cash -= cost;
+    const recruited = this.add(type, team, x, y, design);
     if (recruited.domain === "air") recruited.flight = 0;
     if (recruited.speed && this.rally)
       recruited.order = this.constrain(recruited, this.rally.x, this.rally.y);
@@ -422,14 +446,17 @@ export class Battle {
   selectAll() {
     this.selected = new Set(
       this.entities
-        .filter((e) => e.team === "blue" && e.speed && e.damage)
+        .filter((e) => e.team === "blue" && e.speed && !e.carriedBy)
         .map((e) => e.id),
     );
   }
   selectAt(x, y, additive = false) {
     const entity = this.entities.find(
       (e) =>
-        e.team === "blue" && e.speed && distance(e, { x, y }) < e.radius + 14,
+        e.team === "blue" &&
+        e.speed &&
+        !e.carriedBy &&
+        distance(e, { x, y }) < e.radius + 14,
     );
     if (!additive) this.selected.clear();
     if (entity) this.selected.add(entity.id);
@@ -449,23 +476,36 @@ export class Battle {
     const enemy = this.entities.find(
       (e) =>
         e.team === (this.actorTeam === "red" ? "blue" : "red") &&
-        (!this.multiplayer || this.isVisible(e, this.actorTeam || "blue")) &&
+        !e.carriedBy &&
+        this.isVisible(e, this.actorTeam || "blue") &&
         distance(e, { x, y }) < e.radius + 16,
     );
     let i = 0,
       unsupported = 0;
-    for (const unit of this.entities.filter((e) => this.selected.has(e.id))) {
-      if (enemy && !(unit.targets || []).includes(enemy.domain)) {
+    for (const unit of this.entities.filter(
+      (e) =>
+        this.selected.has(e.id) &&
+        !e.carriedBy &&
+        e.team === (this.actorTeam || "blue"),
+    )) {
+      if (
+        enemy &&
+        unit.damage &&
+        !(unit.targets || []).includes(enemy.domain)
+      ) {
         unsupported++;
         continue;
       }
       unit.route = null;
       unit.tactical = null;
+      delete unit.recon;
+      delete unit.boarding;
       unit.servicing = false;
       const point = formationPoint(this, i, this.selected.size, x, y);
-      unit.order = enemy
-        ? { target: enemy.id }
-        : this.constrain(unit, point.x, point.y);
+      unit.order =
+        enemy && unit.damage
+          ? { target: enemy.id }
+          : this.constrain(unit, point.x, point.y);
       i++;
     }
     if (i) this.emit("order", { x, y });
@@ -487,6 +527,7 @@ export class Battle {
       return;
     this.time += dt;
     updateTactics(this, dt);
+    advanceShells(this, dt);
     if (!this.multiplayer) updateEnemy(this, TYPES);
     updateLogistics(this, dt);
     advanceMission(this, dt);
@@ -541,7 +582,17 @@ export class Battle {
       this.message = `الموجة ${this.wave} تقترب! احمِ مركز القيادة.`;
     }
     for (const unit of this.entities) {
-      if (unit.hp <= 0 || !unit.damage) continue;
+      if (unit.hp <= 0 || unit.carriedBy || (!unit.damage && !unit.speed))
+        continue;
+      if (updateUnitAbility(this, unit, dt)) continue;
+      if (!unit.damage) {
+        if (
+          unit.order?.x !== undefined &&
+          moveUnit(unit, unit.order, this.map, dt)
+        )
+          unit.order = null;
+        continue;
+      }
       if (
         unit.type === "turret" &&
         (unit.team === "blue" || this.multiplayer) &&
@@ -555,7 +606,9 @@ export class Battle {
         (e) =>
           e.team !== unit.team &&
           e.team !== "neutral" &&
+          !e.carriedBy &&
           e.hp > 0 &&
+          this.isVisible(e, unit.team) &&
           unit.targets.includes(e.domain),
       );
       const ordered = unit.order?.target
@@ -566,13 +619,17 @@ export class Battle {
         .filter(
           (e) =>
             distance(unit, e) <= unit.range + e.radius &&
-            clearShot(this.map, unit, e),
+            distance(unit, e) >= (unit.minRange || 0) &&
+            (unit.type !== "drone" || unit.order?.target === e.id) &&
+            (!unit.indirect || !unit.order || unit.order.target) &&
+            (unit.indirect || clearShot(this.map, unit, e)),
         )
         .sort((a, b) => distance(unit, a) - distance(unit, b))[0];
       const target =
         ordered &&
         distance(unit, ordered) <= unit.range + ordered.radius &&
-        clearShot(this.map, unit, ordered)
+        distance(unit, ordered) >= (unit.minRange || 0) &&
+        (unit.indirect || clearShot(this.map, unit, ordered))
           ? ordered
           : nearby;
       if (target)
@@ -587,14 +644,38 @@ export class Battle {
         (unit.domain !== "air" || (unit.flight ?? 1) > 0.65)
       ) {
         if (unit.cd <= 0) {
-          target.hp -= unit.damage;
+          if (unit.indirect) {
+            const duration = Math.max(0.6, distance(unit, target) / 280);
+            this.shells.push({
+              team: unit.team,
+              x: unit.x,
+              y: unit.y,
+              tx: target.x,
+              ty: target.y,
+              damage: unit.damage,
+              duration,
+              remaining: duration,
+            });
+          } else if (unit.type === "drone") {
+            for (const victim of opponents)
+              if (distance(victim, target) < 55 + victim.radius) {
+                const damage = Math.round(
+                  unit.damage *
+                    Math.max(0.35, 1 - distance(victim, target) / 100),
+                );
+                victim.hp -= damage;
+                recordDamage(this, unit.team, damage);
+              }
+            unit.hp = 0;
+          } else {
+            target.hp -= unit.damage;
+            recordDamage(this, unit.team, unit.damage);
+          }
           if (unit.team === "blue") {
             this.stats.shots++;
-            this.stats.damage += unit.damage;
           }
           if (this.multiplayer && unit.team === "red") {
             this.statsRed.shots++;
-            this.statsRed.damage += unit.damage;
           }
           if (unit.speed) unit.ammo--;
           unit.cd = unit.cooldown;
@@ -611,18 +692,37 @@ export class Battle {
             domain: unit.domain,
             targetDomain: target.domain,
           });
-          this.effects.push({
-            x: unit.x,
-            y: unit.y,
-            tx: target.x,
-            ty: target.y,
-            domain: unit.domain,
-            targetDomain: target.domain,
-            team: unit.team,
-            life: 0.2,
-          });
+          if (!unit.indirect)
+            this.effects.push({
+              x: unit.x,
+              y: unit.y,
+              tx: target.x,
+              ty: target.y,
+              domain: unit.domain,
+              targetDomain: target.domain,
+              team: unit.team,
+              life: 0.2,
+            });
         }
       } else if (unit.speed) {
+        if (
+          unit.indirect &&
+          ordered &&
+          distance(unit, ordered) < unit.minRange
+        ) {
+          const d = Math.max(1, distance(unit, ordered));
+          moveUnit(
+            unit,
+            this.constrain(
+              unit,
+              unit.x + ((unit.x - ordered.x) / d) * 100,
+              unit.y + ((unit.y - ordered.y) / d) * 100,
+            ),
+            this.map,
+            dt,
+          );
+          continue;
+        }
         const enemyHQ = opponents.find((e) => e.type === "hq");
         const destination =
           ordered ||
@@ -642,6 +742,7 @@ export class Battle {
         }
       }
     }
+    updatePassengers(this);
     for (const entity of this.entities) {
       entity.firing = Math.max(0, (entity.firing || 0) - dt);
       if (entity.hp <= 0 && entity.team === "red") {

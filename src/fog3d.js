@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { visionRadius } from "./unit-abilities.js";
 export function createFog(scene, stage) {
   const canvas = document.createElement("canvas");
   canvas.width = 400;
@@ -32,14 +33,8 @@ export function createFog(scene, stage) {
       }
       ctx.globalCompositeOperation = "destination-out";
       for (const e of b.entities.filter((e) => e.team === "blue")) {
-        const radius =
-          (e.domain === "air"
-            ? 340
-            : e.type === "hq"
-              ? 280
-              : e.speed
-                ? 230
-                : 190) * 0.4;
+        const radius = visionRadius(e) * 0.4;
+        if (!radius) continue;
         const gradient = ctx.createRadialGradient(
           e.x * 0.4,
           e.y * 0.4,
