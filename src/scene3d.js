@@ -1,8 +1,17 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { mapFor } from "./maps.js";
+import { enhanceEnvironment } from "./environment3d.js";
 
 // All models are built locally from geometry; no downloaded textures or game assets.
-export function createBattleScene(canvas, stage) {
+export function createBattleScene(canvas, stage, map = mapFor(0)) {
+  if (
+    map.stage !==
+    ["desert", "highland", "coast", "abyss"].indexOf(stage.terrain)
+  )
+    map = mapFor(
+      ["desert", "highland", "coast", "abyss"].indexOf(stage.terrain),
+    );
   const renderer = new THREE.WebGLRenderer({
     canvas,
     antialias: true,
@@ -18,10 +27,12 @@ export function createBattleScene(canvas, stage) {
   const scene = new THREE.Scene();
   const underwater = stage.terrain === "abyss",
     naval = stage.terrain === "coast";
-  scene.background = new THREE.Color(
-    underwater ? "#082e48" : naval ? "#9cc6d6" : "#bbd5e3",
+  scene.background = new THREE.Color(map.sky);
+  scene.fog = new THREE.Fog(
+    scene.background,
+    map.mist ? 850 : 1500,
+    map.mist ? 2200 : 2900,
   );
-  scene.fog = new THREE.Fog(scene.background, 1500, 2900);
   const camera = new THREE.PerspectiveCamera(42, 1, 2, 4000);
   const controls = new OrbitControls(camera, canvas);
   controls.target.set(0, 0, 0);
@@ -180,6 +191,9 @@ export function createBattleScene(canvas, stage) {
   grid.material.transparent = true;
   grid.material.opacity = 0.13;
   scene.add(grid);
+  grid.visible = false;
+  if (water) water.visible = false;
+  const environment = enhanceEnvironment(scene, terrain, stage, map);
   function label(text, color) {
     const c = document.createElement("canvas");
     c.width = 256;
@@ -367,9 +381,10 @@ export function createBattleScene(canvas, stage) {
   const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0),
     raycaster = new THREE.Raycaster(),
     mouse = new THREE.Vector2();
+  const flightHeight = Math.max(110, ...map.obstacles.map((o) => o.h + 55));
   function altitude(domain, time) {
     return domain === "air"
-      ? 65
+      ? flightHeight
       : domain === "sub"
         ? underwater
           ? 12
@@ -420,6 +435,16 @@ export function createBattleScene(canvas, stage) {
     effectGeo.setDrawRange(0, Math.min(vertices.length, 3072) / 3);
     if (water)
       water.material.opacity = 0.2 + Math.sin(battle.time * 1.5) * 0.06;
+    environment.animate(battle);
+    for (const entity of battle.entities) {
+      const model = models.get(entity.id);
+      if (entity.firing > 0 && model) {
+        model.position.y -= entity.type === "tank" ? entity.firing * 9 : 0;
+        if (entity.type === "turret") model.rotation.y = entity.aim || 0;
+      }
+      if (entity.domain === "sea" && model)
+        model.rotation.z = Math.sin(battle.time * 1.7 + entity.id) * 0.025;
+    }
     controls.update();
     renderer.render(scene, camera);
   }
@@ -470,6 +495,7 @@ export function createBattleScene(canvas, stage) {
     });
   }
   function dispose(releaseContext = false) {
+    environment.dispose();
     controls.dispose();
     scene.traverse((o) => {
       if (!o.isSprite) o.geometry?.dispose();
@@ -490,6 +516,20 @@ export function createBattleScene(canvas, stage) {
   }
   return {
     draw,
+    effects: environment.events,
+    focusPoint(x, y) {
+      const offset = camera.position.clone().sub(controls.target);
+      controls.target.set(
+        Math.max(-480, Math.min(480, x - 500)),
+        0,
+        Math.max(-290, Math.min(290, y - 310)),
+      );
+      camera.position.copy(controls.target).add(offset);
+      controls.update();
+    },
+    cameraTarget() {
+      return { x: controls.target.x + 500, y: controls.target.z + 310 };
+    },
     pick,
     project,
     home,

@@ -1,4 +1,6 @@
 import { STAGES } from "./campaign.js";
+import { mapFor, blocked } from "./maps.js";
+import { moveUnit, clearShot, walkable } from "./navigation.js";
 export const WIDTH = 1000,
   HEIGHT = 620;
 export const TYPES = {
@@ -142,9 +144,12 @@ export const TYPES = {
 };
 const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 export class Battle {
-  constructor(stage = 0) {
+  constructor(stage = 0, mapId) {
     this.stageIndex = Number.isInteger(stage) && STAGES[stage] ? stage : 0;
     this.stage = STAGES[this.stageIndex];
+    this.map = mapFor(this.stageIndex, mapId);
+    this.events = [];
+    this.eventSequence = 0;
     this.nextId = 1;
     this.cash = this.stage.cash;
     this.time = 0;
@@ -202,6 +207,18 @@ export class Battle {
     if (type === "turret" && this.stageIndex === 3) e.domain = "sub";
     this.entities.push(e);
     return e;
+  }
+  emit(kind, data = {}) {
+    this.events.push({
+      id: ++this.eventSequence,
+      kind,
+      time: this.time,
+      ...data,
+    });
+    if (this.events.length > 160) this.events.shift();
+  }
+  takeEvents() {
+    return this.events.splice(0);
   }
   has(type) {
     return this.entities.some(
@@ -265,6 +282,26 @@ export class Battle {
           ? 95
           : ((n % 5) - 2) * 25);
       ({ x, y } = this.constrain(spec, x, y));
+      if (!walkable(this.map, spec, x, y)) {
+        let free = null;
+        for (let radius = 25; radius <= 200 && !free; radius += 25)
+          for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 4) {
+            const point = this.constrain(
+              spec,
+              x + Math.cos(angle) * radius,
+              y + Math.sin(angle) * radius,
+            );
+            if (walkable(this.map, spec, point.x, point.y)) {
+              free = point;
+              break;
+            }
+          }
+        if (!free) {
+          this.message = "لا توجد مساحة آمنة لخروج الوحدة";
+          return false;
+        }
+        ({ x, y } = free);
+      }
     } else {
       if (
         !Number.isFinite(x) ||
@@ -287,6 +324,10 @@ export class Battle {
             : "ابنِ منشآت الدعم في القطاع العلوي قبل خط 200";
         return false;
       }
+      if (blocked(this.map, x, y, spec.radius + 8)) {
+        this.message = "لا يمكن البناء فوق تضاريس الخريطة";
+        return false;
+      }
       if (
         this.entities.some(
           (e) =>
@@ -299,6 +340,7 @@ export class Battle {
     }
     this.cash -= spec.cost;
     this.add(type, "blue", x, y);
+    this.emit(spec.speed ? "train" : "build", { type, x, y });
     this.message = `تم تجهيز ${spec.name}`;
     return true;
   }
@@ -335,11 +377,13 @@ export class Battle {
         unsupported++;
         continue;
       }
+      unit.route = null;
       unit.order = enemy
         ? { target: enemy.id }
         : this.constrain(unit, x + (i % 3) * 20, y + Math.floor(i / 3) * 20);
       i++;
     }
+    if (i) this.emit("order", { x, y });
     this.message = i
       ? enemy
         ? "أمر هجوم على الهدف"
@@ -367,6 +411,7 @@ export class Battle {
     }
     if (this.time >= this.nextWave && this.wave < this.stage.waves) {
       this.wave++;
+      this.emit("wave", { wave: this.wave });
       this.nextWave += this.stage.interval;
       for (let i = 0; i < this.wave + 2; i++) {
         const pool = this.stage.enemies;
@@ -397,16 +442,33 @@ export class Battle {
         : null;
       if (unit.order?.target && !ordered) unit.order = null;
       const nearby = opponents
-        .filter((e) => distance(unit, e) <= unit.range + e.radius)
+        .filter(
+          (e) =>
+            distance(unit, e) <= unit.range + e.radius &&
+            clearShot(this.map, unit, e),
+        )
         .sort((a, b) => distance(unit, a) - distance(unit, b))[0];
       const target =
-        ordered && distance(unit, ordered) <= unit.range + ordered.radius
+        ordered &&
+        distance(unit, ordered) <= unit.range + ordered.radius &&
+        clearShot(this.map, unit, ordered)
           ? ordered
           : nearby;
       if (target) {
         if (unit.cd <= 0) {
           target.hp -= unit.damage;
           unit.cd = unit.cooldown;
+          unit.firing = 0.2;
+          unit.aim = Math.atan2(target.x - unit.x, target.y - unit.y);
+          this.emit("shot", {
+            type: unit.type,
+            x: unit.x,
+            y: unit.y,
+            tx: target.x,
+            ty: target.y,
+            domain: unit.domain,
+            targetDomain: target.domain,
+          });
           this.effects.push({
             x: unit.x,
             y: unit.y,
@@ -425,16 +487,21 @@ export class Battle {
           (unit.order?.x !== undefined ? unit.order : null) ||
           (unit.team === "red" ? enemyHQ || opponents[0] : null);
         if (destination) {
-          const point = this.constrain(unit, destination.x, destination.y),
-            d = distance(unit, point);
-          if (d > 5) {
-            const step = Math.min(unit.speed * dt, d);
-            unit.x += ((point.x - unit.x) / d) * step;
-            unit.y += ((point.y - unit.y) / d) * step;
-            unit.heading = Math.atan2(point.x - unit.x, point.y - unit.y);
-          } else if (!ordered) unit.order = null;
+          const point = this.constrain(unit, destination.x, destination.y);
+          if (moveUnit(unit, point, this.map, dt) && !ordered)
+            unit.order = null;
         }
       }
+    }
+    for (const entity of this.entities) {
+      entity.firing = Math.max(0, (entity.firing || 0) - dt);
+      if (entity.hp <= 0)
+        this.emit("explosion", {
+          x: entity.x,
+          y: entity.y,
+          domain: entity.domain,
+          size: entity.radius,
+        });
     }
     this.entities = this.entities.filter((e) => e.hp > 0);
     this.selected = new Set(
@@ -443,11 +510,13 @@ export class Battle {
     this.effects = this.effects.filter((e) => (e.life -= dt) > 0);
     if (!this.has("hq")) {
       this.status = "lost";
+      this.emit("defeat");
       this.message = "سقط مركز القيادة. أعد المحاولة بخطة دفاع أقوى.";
     } else if (
       !this.entities.some((e) => e.team === "red" && e.type === "hq")
     ) {
       this.status = "won";
+      this.emit("victory");
       this.message = "انتصار! تم تدمير مركز قيادة العدو.";
     }
   }

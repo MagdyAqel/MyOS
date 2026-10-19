@@ -2,6 +2,7 @@ import './style.css';
 import { setupBrowser } from './browser.js';
 import { setupNotes } from './notes.js';
 import { bootDesktop, DEVELOPER } from './boot.js';
+import { createWallpaperManager, setupPersonalization } from './wallpapers.js';
 
 const apps = [
   {id:'files', name:'مستكشف الملفات', icon:'📁', color:'#ffcb55'},
@@ -77,11 +78,10 @@ function openApp(id){
   }
   if(id==='calculator') setupCalculator(content);
   if(id==='files') setupFiles(content);
-  if(id==='settings'){content.innerHTML=`<div class="settings-page"><span class="eyebrow">MAKE IT YOURS</span><h2>مساحة تشبهك</h2><p class="muted">خصّص مظهر سطح المكتب.</p><h3>المظهر</h3><div class="theme-options"><button data-theme="dark">🌙 &nbsp; ليلي</button><button data-theme="light">☀ &nbsp; نهاري</button></div><h3>الخلفية</h3><div class="wallpapers"><button data-wall="blue" aria-label="خلفية زرقاء"></button><button data-wall="purple" aria-label="خلفية بنفسجية"></button><button data-wall="green" aria-label="خلفية خضراء"></button></div><p class="muted">تُحفظ تفضيلاتك محليًا، ولا تحتاج إلى حساب.</p></div>`;content.querySelectorAll('[data-theme]').forEach(b=>b.onclick=()=>setTheme(b.dataset.theme));content.querySelectorAll('[data-wall]').forEach(b=>b.onclick=()=>setWallpaper(b.dataset.wall));}
-  if(id==='about')content.innerHTML='<div class="about-page"><span class="about-mark">◈</span><h2>MyOS</h2><p>سطح مكتب صغير. احتمالات كبيرة.</p><p class="muted">محاكاة تفاعلية مستوحاة من ويندوز 11 تعمل داخل المتصفح.<br>ليست نظام تشغيل حقيقيًا، ولا تشغّل برامج Windows.</p><span class="version">الإصدار 2.0 · Develped by:Pro. Magdy S. Aqel</span></div>';
+  if(id==='settings')w.cleanup=setupPersonalization(content,wallpaperManager,setTheme);
+  if(id==='about')content.innerHTML='<div class="about-page"><span class="about-mark">◈</span><h2>MyOS</h2><p>سطح مكتب صغير. احتمالات كبيرة.</p><p class="muted">محاكاة تفاعلية مستوحاة من ويندوز 11 تعمل داخل المتصفح.<br>ليست نظام تشغيل حقيقيًا، ولا تشغّل برامج Windows.</p><span class="version">الإصدار 2.1 · Develped by:Pro. Magdy S. Aqel</span></div>';
 }
-function setWallpaper(value){document.documentElement.dataset.wallpaper=value;save('myos-wallpaper',value);}
-setWallpaper(read('myos-wallpaper','blue'));
+const wallpaperManager=createWallpaperManager();
 function setupFiles(content){
   const folders={'الرئيسية':[['📁','المستندات'],['📁','الصور'],['📁','التنزيلات'],['📄','مرحبًا.txt']], 'المستندات':[['📄','أفكاري.txt'],['📄','قائمة المهام.txt']], 'الصور':[['🌄','غروب الشمس'],['🏞','رحلة إلى الطبيعة']], 'التنزيلات':[]};
   content.innerHTML=`<div class="file-layout"><aside>${Object.keys(folders).map((f,i)=>`<button data-folder="${f}">${i?'📁':'⌂'} &nbsp; ${f}</button>`).join('')}</aside><div class="file-main"><div class="file-path"></div><div class="file-items"></div><div class="file-status"></div></div></div>`;

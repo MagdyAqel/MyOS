@@ -1,0 +1,146 @@
+.sound-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sound-controls button {
+  font-size: 11px;
+}
+.sound-controls [aria-pressed="true"] {
+  border-color: #7ac9b5;
+  background: #214c46;
+}
+.sound-controls label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: #a3bec5;
+}
+.sound-controls input {
+  width: 72px;
+  accent-color: #7ac9b5;
+}
+.sound-status {
+  margin: 0;
+  padding: 5px 18px 8px;
+  background: #142a31;
+  color: #92b5bf;
+  font-size: 10px;
+}
+.map-preview {
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #335360;
+}
+.map-preview svg {
+  width: 100%;
+  aspect-ratio: 1000/620;
+  border: 1px solid #4b6973;
+  border-radius: 4px;
+  display: block;
+  margin-bottom: 8px;
+}
+.map-preview strong {
+  font-size: 13px;
+  color: #d8e9dd;
+}
+.map-preview p {
+  font-size: 10px;
+  color: #9db6ba;
+  line-height: 1.8;
+  margin: 6px 0;
+}
+.battle-minimap {
+  position: absolute;
+  bottom: 14px;
+  right: 14px;
+  width: 170px;
+  padding: 4px !important;
+  background: #091b29e8 !important;
+  border: 1px solid #94c1cf88 !important;
+  box-shadow: 0 4px 20px #0005;
+  touch-action: manipulation;
+}
+.battle-minimap svg {
+  width: 100%;
+  display: block;
+}
+.camera-tools {
+  bottom: 14px;
+  left: 14px;
+}
+.rts-header .eyebrow {
+  font-size: 8px;
+}
+.campaign-bar {
+  gap: 10px;
+}
+.campaign-bar label {
+  font-size: 10px;
+}
+.campaign-bar select {
+  max-width: 245px;
+  font-size: 11px;
+}
+.rts-panel {
+  max-height: calc(100dvh - 270px);
+}
+@media (max-width: 1100px) {
+  .sound-controls label {
+    display: none;
+  }
+  .rts-header {
+    gap: 9px;
+  }
+  .rts-stats {
+    gap: 10px;
+  }
+  .campaign-bar small {
+    display: none;
+  }
+}
+@media (max-width: 850px) {
+  .sound-controls {
+    order: 1;
+  }
+  .sound-controls label {
+    display: flex;
+  }
+  .rts-header > button {
+    order: 2;
+  }
+  .campaign-bar label {
+    width: calc(50% - 6px);
+    display: block;
+  }
+  .campaign-bar select {
+    display: block;
+    width: 100%;
+    margin-top: 5px;
+    font-size: 10px;
+    padding: 7px;
+  }
+  .rts-panel {
+    max-height: none;
+  }
+  .map-preview {
+    display: none;
+  }
+  .battle-minimap {
+    width: 105px;
+    bottom: 49px;
+    right: 8px;
+  }
+  .camera-tools {
+    bottom: 9px;
+    left: 8px;
+  }
+  .sound-status {
+    font-size: 9px;
+    padding: 5px 12px 8px;
+  }
+  .rts-header strong {
+    font-size: 15px;
+  }
+}
