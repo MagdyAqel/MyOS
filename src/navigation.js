@@ -88,7 +88,16 @@ export function moveUnit(unit, point, map, dt) {
     unit.route = findRoute(map, unit, unit, point);
     unit.routeGoal = { ...point };
   }
-  let budget = unit.speed * dt;
+  const airFactor =
+    unit.domain === "air" ? 0.25 + 0.75 * (unit.flight ?? 1) : 1;
+  const damageFactor =
+    unit.type !== "soldier" && unit.hp < unit.maxHp * 0.3 ? 0.72 : 1;
+  const topSpeed = unit.speed * airFactor * damageFactor;
+  unit.velocity = Math.min(
+    topSpeed,
+    (unit.velocity || 0) + unit.speed * 0.9 * dt,
+  );
+  let budget = unit.velocity * dt;
   while (unit.route.length && budget > 0) {
     const next = unit.route[0],
       dx = next.x - unit.x,
@@ -99,7 +108,25 @@ export function moveUnit(unit, point, map, dt) {
       continue;
     }
     const step = Math.min(budget, d);
-    unit.heading = Math.atan2(dx, dy);
+    const desired = Math.atan2(dx, dy);
+    const delta =
+      unit.heading === undefined
+        ? 0
+        : Math.atan2(
+            Math.sin(desired - unit.heading),
+            Math.cos(desired - unit.heading),
+          );
+    const turn =
+      (unit.domain === "sea" || unit.domain === "sub"
+        ? 0.9
+        : unit.domain === "air"
+          ? 1.8
+          : 2.3) * dt;
+    unit.heading =
+      unit.heading === undefined
+        ? desired
+        : unit.heading + Math.max(-turn, Math.min(turn, delta));
+    unit.heading = Math.atan2(Math.sin(unit.heading), Math.cos(unit.heading));
     unit.x += (dx / d) * step;
     unit.y += (dy / d) * step;
     budget -= step;

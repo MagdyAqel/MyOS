@@ -1,3 +1,5 @@
+import { parseCareer } from "./career.js";
+import { parseDocuments } from "./documents.js";
 import { parseNotebook, NOTEBOOK_KEY } from "./notebook.js";
 import { parseFiles, FILES_KEY } from "./file-store.js";
 import { restoreBattle, BATTLE_MANUAL, BATTLE_AUTO } from "./battle-save.js";
@@ -6,6 +8,8 @@ export const SYNC_KEYS = [
   FILES_KEY,
   BATTLE_MANUAL,
   BATTLE_AUTO,
+  "myos-career-v1",
+  "myos-documents-v1",
   "myos-campaign-v1",
   "myos-map-choice-v1",
 ];
@@ -30,6 +34,8 @@ export function validateSyncSnapshot(snapshot) {
       throw Error("محتوى مزامنة غير مسموح");
     if (key === NOTEBOOK_KEY) parseNotebook(value);
     else if (key === FILES_KEY) parseFiles(value);
+    else if (key === "myos-career-v1") parseCareer(value);
+    else if (key === "myos-documents-v1") parseDocuments(value);
     else if ([BATTLE_MANUAL, BATTLE_AUTO].includes(key)) restoreBattle(value);
     else {
       const data = JSON.parse(value);
@@ -69,6 +75,9 @@ export function snapshotSummary(snapshot) {
   const d = snapshot.datasets;
   return {
     notes: d[NOTEBOOK_KEY] ? parseNotebook(d[NOTEBOOK_KEY]).notes.length : 0,
+    documents: d["myos-documents-v1"]
+      ? parseDocuments(d["myos-documents-v1"]).documents.length
+      : 0,
     files: d[FILES_KEY]
       ? parseFiles(d[FILES_KEY]).entries.filter(
           (e) => e.kind === "file" && !e.deleted,

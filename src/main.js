@@ -1,3 +1,5 @@
+import {setupAppearance,setupDesktopExtras} from "./desktop-extras.js";
+import "./productivity.css";
 import './style.css';
 import { setupBrowser } from './browser.js';
 import { setupNotes } from './notes.js';
@@ -13,6 +15,10 @@ const apps = [
   {id:'calculator', name:'الحاسبة', icon:'▦', color:'#b9c8de'},
   {id:'browser', name:'المتصفح', icon:'🌐', color:'#68c9f3'},
   {id:'strategy', name:'قيادة الأفق 3D', icon:'🎖', color:'#f5cc83'},
+  {id:'arena',name:'اللعب عبر الويب',icon:'⚔',color:'#efcf93'},
+  {id:'writer',name:'محرر المستندات',icon:'✒',color:'#d5c4ff'},
+  {id:'media',name:'الصور والوسائط',icon:'▧',color:'#ffca9f'},
+  {id:'backup',name:'النسخ الاحتياطي',icon:'▣',color:'#92dfc5'},
   {id:'install',name:'تثبيت MyOS',icon:'⇩',color:'#8cd5bd'},
   {id:'cloud', name:'المزامنة السحابية', icon:'☁', color:'#9be0ff'},
   {id:'settings', name:'الإعدادات', icon:'⚙', color:'#adc7df'},
@@ -22,7 +28,7 @@ const read = (key, fallback) => { try { return localStorage.getItem(key) ?? fall
 const save = (key, value) => { try { localStorage.setItem(key, value); } catch { toast('تعذّر الحفظ في هذا المتصفح'); } };
 let z = 10;
 const windows = new Map();
-window.addEventListener('myos:before-data-restore',()=>{for(const [id,w] of [...windows])if(id!=='cloud')w.querySelector('[data-action=close]').click();});
+window.addEventListener('myos:before-data-restore',()=>{for(const [id,w] of [...windows])if(!['cloud','backup'].includes(id))w.querySelector('[data-action=close]').click();});
 const root = document.querySelector('#app');
 root.innerHTML = `
 <main id="desktop" aria-label="سطح المكتب">
@@ -38,7 +44,7 @@ root.innerHTML = `
 <footer id="taskbar" class="glass"><div class="weather"><span>☀</span><div>٢٤°<small>يوم جميل</small></div></div><nav class="task-apps" aria-label="شريط المهام"><button id="start-button" aria-label="ابدأ" aria-expanded="false"><span class="windows-logo"><i></i><i></i><i></i><i></i></span></button><button id="search-button" aria-label="بحث">⌕</button>${apps.filter(a=>a.id!=='about').map(a=>`<button data-open="${a.id}" data-task="${a.id}" aria-label="${a.name}">${a.icon}</button>`).join('')}</nav><button id="tray" aria-label="فتح الإعدادات السريعة"><span>⌁ &nbsp; ◖ &nbsp; ▰</span><span id="clock"></span></button></footer>
 <div id="lock-screen" class="hidden"><div><span class="eyebrow">MYOS</span><h2 id="lock-clock"></h2><p>مساحتك بانتظارك</p><button id="unlock">الدخول إلى سطح المكتب ←</button></div></div>`;
 
-function toast(message) { const el=document.querySelector('#toast'); el.textContent=message; el.classList.remove('hidden'); clearTimeout(toast.timer); toast.timer=setTimeout(()=>el.classList.add('hidden'),3000); }
+function toast(message) {window.dispatchEvent(new CustomEvent('myos:notice',{detail:{text:message}})); const el=document.querySelector('#toast'); el.textContent=message; el.classList.remove('hidden'); clearTimeout(toast.timer); toast.timer=setTimeout(()=>el.classList.add('hidden'),3000); }
 function toggleStart(force) { const el=document.querySelector('#start'); const visible=force ?? el.classList.contains('hidden'); el.classList.toggle('hidden',!visible); document.querySelector('#start-button').setAttribute('aria-expanded',String(visible)); document.querySelector('#quick').classList.add('hidden'); if(visible) document.querySelector('#search').focus(); }
 function renderApps(query='') { document.querySelector('#app-grid').innerHTML=apps.filter(a=>a.name.includes(query)||a.id.includes(query.toLowerCase())).map(a=>`<button data-open="${a.id}" aria-label="${a.name}"><span class="app-icon" style="--icon:${a.color}">${a.icon}</span>${a.name}</button>`).join('') || '<p class="muted">لا توجد نتائج</p>'; }
 renderApps();
@@ -59,14 +65,14 @@ function setTheme(theme){document.documentElement.dataset.theme=theme;save('myos
 setTheme(read('myos-theme','dark'));
 document.querySelector('#theme-quick').onclick=()=>setTheme(document.documentElement.dataset.theme==='light'?'dark':'light');
 
-function openApp(id){
+function openApp(id,matchConnection=null){
   toggleStart(false);document.querySelector('#quick').classList.add('hidden');
   if(windows.has(id)){const w=windows.get(id);w.classList.remove('hidden');w.style.zIndex=++z;return;}
   const app=apps.find(a=>a.id===id);if(!app)return;
   const w=document.createElement('section');w.className='window glass';w.setAttribute('aria-label',app.name);w.style.zIndex=++z;
   if(id==='strategy')w.classList.add('game-window','maximized');
   if(id==='browser')w.classList.add('browser-window');
-  w.style.left=`${Math.max(8,(innerWidth-Math.min(760,innerWidth-24))/2+windows.size*18)}px`;w.style.top=`${70+windows.size*24}px`;
+  w.style.left=`${Math.max(8,(innerWidth-Math.min(760,innerWidth-24))/2+windows.size*18)}px`;w.style.top=`${Math.min(70+windows.size*24,Math.max(0,innerHeight-550))}px`;
   w.innerHTML=`<header class="titlebar"><span>${app.icon} &nbsp; ${app.name}</span><div class="window-controls"><button data-action="minimize" aria-label="تصغير">─</button><button data-action="maximize" aria-label="تكبير">□</button><button data-action="close" aria-label="إغلاق">×</button></div></header><div class="window-content"></div>`;
   document.querySelector('#windows').append(w);windows.set(id,w);document.querySelector(`[data-task="${id}"]`)?.classList.add('running');
   w.onpointerdown=()=>w.style.zIndex=++z;
@@ -80,14 +86,16 @@ function openApp(id){
   if(id==='browser') w.cleanup=setupBrowser(content);
   if(id==='strategy'){
     content.textContent='جارٍ تحميل العالم ثلاثي الأبعاد…';
-    import('./game.js').then(({setupGame})=>{if(w.isConnected)w.cleanup=setupGame(content);}).catch(()=>{if(w.isConnected)content.textContent='تعذّر تحميل اللعبة. أعد تحميل الصفحة وحاول مجددًا.';});
+    import('./game.js').then(({setupGame})=>{if(w.isConnected)w.cleanup=setupGame(content,{network:matchConnection});}).catch(()=>{if(w.isConnected)content.textContent='تعذّر تحميل اللعبة. أعد تحميل الصفحة وحاول مجددًا.';});
   }
   if(id==='cloud'){content.textContent='جارٍ فتح المزامنة…';import('./cloud.js').then(({setupCloud})=>{if(w.isConnected)w.cleanup=setupCloud(content);}).catch(()=>{if(w.isConnected)content.textContent='تعذّر فتح المزامنة. أعد المحاولة.';});}
+  if(id==='arena'){content.textContent='جارٍ فتح المواجهة…';import('./arena.js').then(({setupArena})=>{if(w.isConnected)w.cleanup=setupArena(content,{openGame:connection=>{windows.get('strategy')?.querySelector('[data-action=close]').click();openApp('strategy',connection);}});}).catch(()=>{if(w.isConnected)content.textContent='تعذّر فتح اللعب عبر الويب';});}
+  if(['writer','media','backup'].includes(id)){content.textContent='جارٍ فتح التطبيق…';const loaders={writer:()=>import('./documents.js').then(m=>m.setupWriter),media:()=>import('./media.js').then(m=>m.setupMedia),backup:()=>import('./backup.js').then(m=>m.setupBackup)};loaders[id]().then(setup=>{if(w.isConnected)w.cleanup=setup(content);}).catch(()=>{if(w.isConnected)content.textContent='تعذّر فتح التطبيق. أعد المحاولة.';});}
   if(id==='install')w.cleanup=setupInstall(content);
   if(id==='calculator') setupCalculator(content);
   if(id==='files') w.cleanup=setupFiles(content);
-  if(id==='settings')w.cleanup=setupPersonalization(content,wallpaperManager,setTheme);
-  if(id==='about')content.innerHTML='<div class="about-page"><span class="about-mark">◈</span><h2>MyOS</h2><p>سطح مكتب صغير. احتمالات كبيرة.</p><p class="muted">محاكاة تفاعلية مستوحاة من ويندوز 11 تعمل داخل المتصفح.<br>ليست نظام تشغيل حقيقيًا، ولا تشغّل برامج Windows.</p><span class="version">الإصدار 3.0 · Develped by:Pro. Magdy S. Aqel</span></div>';
+  if(id==='settings'){w.cleanup=setupPersonalization(content,wallpaperManager,setTheme);setupAppearance(content);}
+  if(id==='about')content.innerHTML='<div class="about-page"><span class="about-mark">◈</span><h2>MyOS</h2><p>سطح مكتب صغير. احتمالات كبيرة.</p><p class="muted">محاكاة تفاعلية مستوحاة من ويندوز 11 تعمل داخل المتصفح.<br>ليست نظام تشغيل حقيقيًا، ولا تشغّل برامج Windows.</p><span class="version">الإصدار 4.0 · Develped by:Pro. Magdy S. Aqel</span></div>';
 }
 const wallpaperManager=createWallpaperManager();
 function setupCalculator(content){
@@ -99,5 +107,7 @@ function setupCalculator(content){
 }
 
 setupMobileViewport();
+setupDesktopExtras({openApp,windows,raise:w=>w.style.zIndex=++z,lock:()=>document.querySelector('#lock-screen').classList.remove('hidden')});
 setupPWA();
 bootDesktop();
+if(new URLSearchParams(location.hash.slice(1)).has("myos-room"))openApp("arena");

@@ -1,0 +1,173 @@
+:root {
+  --desktop-icon-size: 32px;
+  --desktop-text-scale: 1;
+}
+.desktop-icons button .app-icon {
+  font-size: var(--desktop-icon-size);
+}
+.desktop-icons button > span:last-child {
+  font-size: calc(11px * var(--desktop-text-scale));
+}
+.appearance-options {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+  margin-top: 22px;
+}
+.appearance-options label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  max-width: 420px;
+  padding: 9px 0;
+  font-size: 13px;
+}
+.appearance-options input {
+  min-height: 38px;
+  accent-color: var(--accent);
+}
+.appearance-options p {
+  font-size: 12px;
+  line-height: 2;
+  color: var(--muted);
+}
+.appearance-options button {
+  border: 1px solid var(--border);
+  padding: 12px;
+  background: var(--surface);
+}
+#notification-center {
+  position: fixed;
+  right: 18px;
+  bottom: 75px;
+  width: 360px;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100dvh - 100px);
+  overflow: auto;
+  border-radius: 10px;
+  padding: 16px;
+  z-index: 1100;
+}
+#notification-center header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+#notification-center h2 {
+  font-size: 18px;
+  flex: 1;
+}
+#notification-center button {
+  padding: 10px;
+  border: 1px solid var(--border);
+  min-height: 40px;
+  font-size: 12px;
+}
+.notification-list article {
+  background: var(--surface);
+  padding: 12px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  line-height: 1.8;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.notification-list small,
+#notification-center > p {
+  font-size: 10px;
+  color: var(--muted);
+}
+#notifications-button {
+  position: absolute;
+  right: 198px;
+  width: 40px;
+  height: 44px;
+  font-size: 23px;
+}
+#notifications-button:after {
+  content: attr(data-unread);
+  position: absolute;
+  right: 0;
+  top: 1px;
+  background: var(--accent);
+  color: #10203b;
+  border-radius: 10px;
+  font: 10px Arial;
+  padding: 3px;
+}
+#notifications-button[data-unread="0"]:after {
+  display: none;
+}
+.task-apps {
+  max-width: calc(100vw - 410px);
+}
+@media (max-width: 650px),
+  (max-width: 950px) and (max-height: 500px),
+  (pointer: coarse) and (max-width: 1024px) {
+  #notifications-button {
+    right: 72px;
+    width: 36px;
+    min-height: 44px;
+  }
+  #taskbar .task-apps {
+    max-width: calc(100vw - 120px);
+    width: calc(100vw - 120px);
+    margin-right: 0;
+    margin-left: 0;
+  }
+  .desktop-icons button .app-icon {
+    font-size: min(var(--desktop-icon-size), 44px);
+  }
+  .desktop-icons button > span:last-child {
+    font-size: calc(12px * var(--desktop-text-scale));
+  }
+  #notification-center {
+    bottom: calc(var(--taskbar-size) + 8px);
+    right: 12px;
+    max-height: calc(var(--app-height) - var(--taskbar-size) - 20px);
+  }
+  .appearance-options input {
+    min-height: 44px;
+  }
+}
+
+/* Thirteen applications still fit the smallest portrait launcher. */
+@media (max-width: 650px) {
+  #desktop .desktop-icons {
+    gap: 8px;
+  }
+  #desktop .desktop-icons button {
+    min-height: 78px;
+    padding: 4px 3px;
+    gap: 3px;
+  }
+  #desktop .desktop-icons button .app-icon {
+    width: 38px;
+    height: 38px;
+    font-size: min(var(--desktop-icon-size), 38px);
+    line-height: 1;
+  }
+  #desktop .desktop-icons button > span:last-child {
+    line-height: 1.2;
+    min-height: 2.4em;
+    max-height: 2.4em;
+    overflow: hidden;
+  }
+}
+@media (min-width: 651px) and (max-width: 950px) and (max-height: 500px) {
+  .desktop-icons {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+}
+@media (max-width: 650px) and (max-height: 700px) {
+  #desktop .desktop-heading {
+    padding: 12px 18px 0;
+  }
+  #desktop .desktop-heading h1 {
+    font-size: 24px;
+    margin: 4px 0;
+  }
+  #desktop .desktop-heading p {
+    margin: 2px 0;
+  }
+}

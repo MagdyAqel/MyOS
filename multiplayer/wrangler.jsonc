@@ -1,0 +1,13 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "myos-arena",
+  "main": "worker.js",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "vars": {
+    "ALLOWED_ORIGINS": "https://magdyaqel.github.io",
+    "CREATION_COOLDOWN": "10"
+  },
+  "durable_objects": {"bindings":[{"name":"ROOMS","class_name":"ArenaRoom"}]},
+  "migrations":[{"tag":"v1","new_sqlite_classes":["ArenaRoom"]}]
+}

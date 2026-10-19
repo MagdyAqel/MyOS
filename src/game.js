@@ -1,3 +1,5 @@
+import { bindNetworkGame } from "./network-game.js";
+import { setupCommandCenter } from "./command-center.js";
 import { Battle, TYPES } from "./battle.js";
 import { STAGES, loadCampaign } from "./campaign.js";
 import { createBattleScene } from "./scene3d.js";
@@ -8,11 +10,16 @@ import "./apps.css";
 import "./campaign.css";
 import "./mobile-game.css";
 import { COMPACT_QUERY } from "./mobile.js";
-import {DIFFICULTIES,MISSIONS,missionStatus} from "./systems.js";
-import {saveBattle,readBattle,restoreBattle,BATTLE_AUTO} from "./battle-save.js";
+import { DIFFICULTIES, MISSIONS, missionStatus } from "./systems.js";
+import {
+  saveBattle,
+  readBattle,
+  restoreBattle,
+  BATTLE_AUTO,
+} from "./battle-save.js";
 import "./features.css";
 
-export function setupGame(content) {
+export function setupGame(content, { network = null } = {}) {
   let storage;
   try {
     storage = localStorage;
@@ -36,7 +43,16 @@ export function setupGame(content) {
   }
   content.innerHTML = `<div class="rts-app">
     <header class="rts-header"><div><span class="eyebrow">COMMAND HORIZON · 3D</span><strong>قيادة الأفق</strong></div><div class="rts-stats" aria-live="off"><span data-stat="cash"></span><span data-stat="wave"></span><span data-stat="army"></span></div><div class="sound-controls"><button data-sound="toggle" aria-pressed="false">تشغيل الأصوات</button><label>الصوت <input type="range" min="0" max="100" aria-label="مستوى صوت اللعبة" value="${Math.round(audio.volume * 100)}"></label></div><button data-game="pause">إيقاف مؤقت</button><button data-game="restart">إعادة المرحلة</button></header>
-    <div class="campaign-bar" id="game-maps"><label>المراحل <select aria-label="اختيار المرحلة">${STAGES.map((s, i) => `<option value="${i}">${i + 1}. ${s.name} — ${s.category}</option>`).join("")}</select></label><label>الخريطة <select aria-label="اختيار الخريطة"></select></label><label>المهمة <select aria-label="نوع المهمة"></select></label><label>الصعوبة <select aria-label="مستوى الصعوبة">${Object.entries(DIFFICULTIES).map(([id,d])=>`<option value="${id}" ${id==='normal'?'selected':''}>${d.name}</option>`).join('')}</select></label><div class="save-controls"><button data-game="save">حفظ المعركة</button><button data-game="resume">استئناف آخر حفظ</button><button data-game="fog" aria-pressed="true">ضباب الحرب</button><span class="battle-save-status" role="status"></span></div><label class="mobile-game-only mobile-volume">مستوى الصوت <input type="range" min="0" max="100" value="${Math.round(audio.volume * 100)}" aria-label="مستوى الصوت للجوال"></label><span class="campaign-progress"></span><button data-game="next">المرحلة التالية ←</button><small>تغيير المرحلة أو الخريطة أو المهمة أو الصعوبة يبدأ معركة جديدة</small></div>
+    <div class="campaign-bar" id="game-maps"><label>المراحل <select aria-label="اختيار المرحلة">${STAGES.map((s, i) => `<option value="${i}">${i + 1}. ${s.name} — ${s.category}</option>`).join("")}</select></label><label>الخريطة <select aria-label="اختيار الخريطة"></select></label><label>المهمة <select aria-label="نوع المهمة"></select></label><label>الصعوبة <select aria-label="مستوى الصعوبة">${Object.entries(
+      DIFFICULTIES,
+    )
+      .map(
+        ([id, d]) =>
+          `<option value="${id}" ${id === "normal" ? "selected" : ""}>${d.name}</option>`,
+      )
+      .join(
+        "",
+      )}</select></label><div class="save-controls"><button data-game="save">حفظ المعركة</button><button data-game="resume">استئناف آخر حفظ</button><button data-game="fog" aria-pressed="true">ضباب الحرب</button><span class="battle-save-status" role="status"></span></div><label class="mobile-game-only mobile-volume">مستوى الصوت <input type="range" min="0" max="100" value="${Math.round(audio.volume * 100)}" aria-label="مستوى الصوت للجوال"></label><span class="campaign-progress"></span><button data-game="next">المرحلة التالية ←</button><small>تغيير المرحلة أو الخريطة أو المهمة أو الصعوبة يبدأ معركة جديدة</small></div>
     <div class="rts-layout"><div class="battlefield"><canvas tabindex="0" aria-label="ساحة المعركة ثلاثية الأبعاد"></canvas><div class="scene-badge">3D · WEBGL</div><span class="mobile-game-only touch-hint">اسحب للتحريك · إصبعان للتقريب والتدوير</span><button class="mobile-game-only mobile-placement" data-game="place-touch">تأكيد البناء المقترح</button><button class="battle-minimap" aria-label="الخريطة المصغرة: انقر لتحريك الكاميرا" title="انقر لتحريك الكاميرا، Shift لإصدار أمر للجيش المحدد"></button><div class="camera-tools" aria-label="التحكم بالكاميرا"><button data-camera="in" aria-label="تقريب الكاميرا">＋</button><button data-camera="out" aria-label="إبعاد الكاميرا">−</button><button data-camera="left" aria-label="تدوير الكاميرا لليسار">↶</button><button data-camera="right" aria-label="تدوير الكاميرا لليمين">↷</button><button data-camera="focus" aria-label="التركيز على الجيش">◎</button><button data-camera="home" aria-label="إعادة ضبط الكاميرا">⌂</button></div><div class="rts-result hidden" role="status"></div></div>
     <aside class="rts-panel" id="game-commands"><button class="mobile-game-only" data-game="multiselect" aria-pressed="false">تحديد متعدد باللمس</button><div class="map-preview"></div><div class="rts-mission"><span></span><h2></h2><p></p></div><h3>إنشاء مبانٍ</h3><div class="build-buttons"></div><button data-game="autoplace">بناء في مكان مقترح</button><div class="mission-objective"></div><p class="selected-logistics"></p><button data-game="service">عودة للصيانة والتسليح</button><h3>تدريب الوحدات</h3><div class="train-buttons"></div><p class="rts-help">اختر مبنى ثم انقر الأرض، أو استخدم المكان المقترح. حدد الوحدات ثم انقر للتحرك أو الهجوم. عجلة الفأرة للتقريب، والزر الأوسط لتدوير الكاميرا، وإصبعان على الهاتف.</p></aside></div>
     <nav class="battle-actions" aria-label="أوامر المعركة"><button class="mobile-game-only" data-game="commands" aria-expanded="false" aria-controls="game-commands">بناء وتدريب</button><button data-game="select">تحديد الجيش</button><button data-game="attack">هجوم على مقر العدو</button><button class="mobile-game-only" data-game="maps" aria-expanded="false" aria-controls="game-maps">الخرائط والصوت</button></nav>
@@ -81,10 +97,34 @@ export function setupGame(content) {
   };
   content.querySelector('[data-game="place-touch"]').onclick = () =>
     content.querySelector('[data-game="autoplace"]').click();
-  let availableSave=readBattle(storage);
-  let lastAuto=0;
-  const missionSelect=content.querySelector('[aria-label="نوع المهمة"]'),difficultySelect=content.querySelector('[aria-label="مستوى الصعوبة"]');
-  function persist(automatic=false){if(!battle)return;try{saveBattle(storage,battle,automatic?BATTLE_AUTO:undefined);availableSave=readBattle(storage);text(content.querySelector(".battle-save-status"),automatic?"حُفظت المعركة تلقائيًا":"تم حفظ المعركة ✓");}catch{text(content.querySelector(".battle-save-status"),"تعذّر حفظ المعركة. التخزين ممتلئ أو غير متاح.");}}
+  let availableSave = readBattle(storage);
+  let lastAuto = 0;
+  const missionSelect = content.querySelector('[aria-label="نوع المهمة"]'),
+    difficultySelect = content.querySelector('[aria-label="مستوى الصعوبة"]');
+  function persist(automatic = false) {
+    if (network) return;
+    if (!battle) return;
+    try {
+      saveBattle(storage, battle, automatic ? BATTLE_AUTO : undefined);
+      availableSave = readBattle(storage);
+      text(
+        content.querySelector(".battle-save-status"),
+        automatic ? "حُفظت المعركة تلقائيًا" : "تم حفظ المعركة ✓",
+      );
+    } catch {
+      text(
+        content.querySelector(".battle-save-status"),
+        "تعذّر حفظ المعركة. التخزين ممتلئ أو غير متاح.",
+      );
+    }
+  }
+  let networkUI;
+  let tacticalUI,
+    orderIntent = null,
+    qualityChoice = "auto";
+  try {
+    qualityChoice = storage.getItem("myos-quality-v1") || "auto";
+  } catch {}
   let battle,
     view,
     building = null,
@@ -98,6 +138,7 @@ export function setupGame(content) {
     if (element.textContent !== value) element.textContent = value;
   };
   function saveProgress() {
+    if (network) return;
     content.querySelector(".campaign-save").removeAttribute("data-error");
     try {
       storage.setItem("myos-campaign-v1", JSON.stringify(progress));
@@ -106,7 +147,7 @@ export function setupGame(content) {
         "المراحل المكتملة محفوظة على هذا المتصفح",
       );
     } catch {
-      content.querySelector(".campaign-save").dataset.error="true";
+      content.querySelector(".campaign-save").dataset.error = "true";
       text(
         content.querySelector(".campaign-save"),
         "تعذّر حفظ تقدم المراحل: التخزين المحلي غير متاح أو ممتلئ",
@@ -114,11 +155,22 @@ export function setupGame(content) {
     }
   }
   function refresh() {
-    content.querySelector('[data-game="resume"]').disabled=!availableSave||availableSave.status!=="playing";
-    content.querySelector('[data-game="fog"]').setAttribute('aria-pressed',String(battle.fog));
-    text(content.querySelector('.mission-objective'),missionStatus(battle));
-    const squad=battle.entities.filter(e=>battle.selected.has(e.id)&&e.maxAmmo);
-    text(content.querySelector('.selected-logistics'),squad.length?`ذخيرة المحدد: ${squad.reduce((n,e)=>n+e.ammo,0)}/${squad.reduce((n,e)=>n+e.maxAmmo,0)} · الصيانة قرب القاعدة`:'اختر وحدات لعرض الذخيرة والصيانة');
+    tacticalUI?.refresh();
+    content.querySelector('[data-game="resume"]').disabled =
+      !availableSave || availableSave.status !== "playing";
+    content
+      .querySelector('[data-game="fog"]')
+      .setAttribute("aria-pressed", String(battle.fog));
+    text(content.querySelector(".mission-objective"), missionStatus(battle));
+    const squad = battle.entities.filter(
+      (e) => battle.selected.has(e.id) && e.maxAmmo,
+    );
+    text(
+      content.querySelector(".selected-logistics"),
+      squad.length
+        ? `ذخيرة المحدد: ${squad.reduce((n, e) => n + e.ammo, 0)}/${squad.reduce((n, e) => n + e.maxAmmo, 0)} · الصيانة قرب القاعدة`
+        : "اختر وحدات لعرض الذخيرة والصيانة",
+    );
     const soundButton = content.querySelector('[data-sound="toggle"]');
     text(soundButton, audio.enabled ? "كتم الأصوات" : "تشغيل الأصوات");
     soundButton.setAttribute(
@@ -138,7 +190,7 @@ export function setupGame(content) {
     soundButton.dataset.audioState = audio.context?.state || "not-started";
     minimap.innerHTML = mapSvg(
       battle.map,
-      battle.entities.filter(e=>battle.isVisible(e)),
+      battle.entities.filter((e) => battle.isVisible(e)),
       battle.selected,
       view?.cameraTarget(),
     );
@@ -195,29 +247,42 @@ export function setupGame(content) {
     content.querySelector('[data-game="autoplace"]').disabled =
       !building || ended || battle.paused || graphicsFailed;
     content.querySelector('[data-game="next"]').disabled =
-      battle.status !== "won" || battle.stageIndex === STAGES.length - 1;
+      battle.status !== "won" ||
+      (!battle.operationId && battle.stageIndex === STAGES.length - 1);
     text(
       content.querySelector(".campaign-progress"),
       `مراحل مكتملة: ${progress.completed.length}/${STAGES.length}`,
     );
-    if (battle.status === "won" && !recorded) {
+    if (!network && battle.status === "won" && !recorded) {
       recorded = true;
       if (!progress.completed.includes(battle.stageIndex))
         progress.completed.push(battle.stageIndex);
       saveProgress();
     }
+    networkUI?.hud();
   }
-  function start(index, mapId = chosenMaps[index],restored=null) {
+  function start(index, mapId = chosenMaps[index], restored = null, run = {}) {
     audio.setActive(false);
     audio.sonar = 0;
     view?.dispose();
     view = null;
-    battle = restored||new Battle(index,mapId,{mission:missionSelect.value,difficulty:difficultySelect.value});
-    lastAuto=battle.time;
-    missionSelect.innerHTML=MISSIONS.filter(m=>m.stages.includes(index)).map(m=>`<option value="${m.id}">${m.name}</option>`).join("");missionSelect.value=battle.mission.id;difficultySelect.value=battle.difficulty;
+    battle =
+      restored ||
+      new Battle(index, mapId, {
+        mission: missionSelect.value,
+        difficulty: difficultySelect.value,
+        ...run,
+      });
+    lastAuto = battle.time;
+    missionSelect.innerHTML = MISSIONS.filter((m) => m.stages.includes(index))
+      .map((m) => `<option value="${m.id}">${m.name}</option>`)
+      .join("");
+    missionSelect.value = battle.mission.id;
+    difficultySelect.value = battle.difficulty;
     chosenMaps[index] = battle.map.id;
     try {
-      storage.setItem("myos-map-choice-v1", JSON.stringify(chosenMaps));
+      if (!network)
+        storage.setItem("myos-map-choice-v1", JSON.stringify(chosenMaps));
     } catch {
       /* Map is usable without persistence. */
     }
@@ -229,6 +294,7 @@ export function setupGame(content) {
       mapSvg(battle.map) +
       `<strong>${battle.map.name}</strong><p>${battle.map.description}</p>`;
     building = null;
+    orderIntent = null;
     last = 0;
     recorded = false;
     graphicsFailed = false;
@@ -271,7 +337,9 @@ export function setupGame(content) {
         }),
     );
     try {
-      view = createBattleScene(canvas, battle.stage, battle.map);
+      view = createBattleScene(canvas, battle.stage, battle.map, {
+        quality: qualityChoice,
+      });
       view.draw(battle);
       canvas.dataset.renderer = "webgl";
     } catch (error) {
@@ -282,13 +350,37 @@ export function setupGame(content) {
     }
     refresh();
   }
-  missionSelect.onchange=()=>start(battle.stageIndex,battle.map.id);
-  difficultySelect.onchange=()=>start(battle.stageIndex,battle.map.id);
-  content.querySelector('[data-game="save"]').onclick=()=>persist(false);
-  content.querySelector('[data-game="resume"]').onclick=()=>{try{const snapshot=readBattle(storage);if(!snapshot)throw Error();const restored=restoreBattle(snapshot);start(restored.stageIndex,restored.map.id,restored);text(content.querySelector('.battle-save-status'),'استُعيدت المعركة. اضغط متابعة للعب.');}catch{text(content.querySelector('.battle-save-status'),'تعذّر قراءة الحفظ؛ ابدأ مهمة جديدة.');}};
-  content.querySelector('[data-game="fog"]').onclick=()=>{battle.fog=!battle.fog;refresh();};
-  content.querySelector('[data-game="service"]').onclick=()=>{battle.serviceSelected();refresh();};
-  const saveOnLeave=()=>persist(true);window.addEventListener('pagehide',saveOnLeave);
+  missionSelect.onchange = () => start(battle.stageIndex, battle.map.id);
+  difficultySelect.onchange = () => start(battle.stageIndex, battle.map.id);
+  content.querySelector('[data-game="save"]').onclick = () => persist(false);
+  content.querySelector('[data-game="resume"]').onclick = () => {
+    try {
+      const snapshot = readBattle(storage);
+      if (!snapshot) throw Error();
+      const restored = restoreBattle(snapshot);
+      start(restored.stageIndex, restored.map.id, restored);
+      text(
+        content.querySelector(".battle-save-status"),
+        "استُعيدت المعركة. اضغط متابعة للعب.",
+      );
+    } catch {
+      text(
+        content.querySelector(".battle-save-status"),
+        "تعذّر قراءة الحفظ؛ ابدأ مهمة جديدة.",
+      );
+    }
+  };
+  content.querySelector('[data-game="fog"]').onclick = () => {
+    battle.fog = !battle.fog;
+    refresh();
+  };
+  content.querySelector('[data-game="service"]').onclick = () => {
+    battle.serviceSelected();
+    refresh();
+  };
+  const saveOnLeave = () => persist(true);
+  window.addEventListener("pagehide", saveOnLeave);
+  window.addEventListener("myos:flush-data", saveOnLeave);
   mapSelect.onchange = () => {
     start(battle.stageIndex, mapSelect.value);
     shell.classList.remove("maps-open");
@@ -309,12 +401,18 @@ export function setupGame(content) {
           "المؤثرات الصوتية مفعّلة: أسلحة وانفجارات ومحركات وأمواج وسونار";
       }
     } catch (error) {
-      status.dataset.error="true";
+      status.dataset.error = "true";
       status.textContent = error.message;
     }
     refresh();
   };
-  content.querySelector('[aria-label="مستوى صوت اللعبة"]').oninput = (event) => {audio.setVolume(Number(event.target.value) / 100);content.querySelector('[aria-label="مستوى الصوت للجوال"]').value=event.target.value;};
+  content.querySelector('[aria-label="مستوى صوت اللعبة"]').oninput = (
+    event,
+  ) => {
+    audio.setVolume(Number(event.target.value) / 100);
+    content.querySelector('[aria-label="مستوى الصوت للجوال"]').value =
+      event.target.value;
+  };
   minimap.onclick = (event) => {
     if (!view) return;
     const rect = minimap.querySelector("svg").getBoundingClientRect(),
@@ -329,8 +427,10 @@ export function setupGame(content) {
       document.hidden ||
       content.closest(".window").classList.contains("hidden") ||
       !document.querySelector("#lock-screen").classList.contains("hidden")
-    )
-      {audio.setActive(false);persist(true);}
+    ) {
+      audio.setActive(false);
+      persist(true);
+    }
   };
   document.addEventListener("visibilitychange", silence);
   const visibilityObserver = new MutationObserver(silence);
@@ -343,9 +443,15 @@ export function setupGame(content) {
     attributeFilter: ["class"],
   });
   select.onchange = () => start(Number(select.value));
-  content.querySelector('[data-game="restart"]').onclick = () =>
-    start(battle.stageIndex);
+  content.querySelector('[data-game="restart"]').onclick = () => {
+    if (battle.operationId) tacticalUI.restart();
+    else start(battle.stageIndex);
+  };
   content.querySelector('[data-game="next"]').onclick = () => {
+    if (battle.status === "won" && battle.operationId) {
+      tacticalUI.advance();
+      return;
+    }
     if (battle.status === "won" && battle.stageIndex < 3)
       start(battle.stageIndex + 1);
   };
@@ -362,11 +468,25 @@ export function setupGame(content) {
   content.querySelector('[data-game="attack"]').onclick = () => {
     building = null;
     const hq = battle.entities.find((e) => e.type === "hq" && e.team === "red");
-    if (hq) battle.command(hq.x, hq.y);
+    if (!hq && network) {
+      battle.message = "استكشف موقع مقر الخصم قبل الهجوم عليه";
+      refresh();
+      return;
+    }
+    if (hq) {
+      battle.commandMode = "move";
+      battle.command(hq.x, hq.y);
+    }
     refresh();
   };
   content.querySelector('[data-game="autoplace"]').onclick = () => {
     if (!building) return;
+    if (network) {
+      networkUI.request({ kind: "autoBuild", unit: building });
+      building = null;
+      refresh();
+      return;
+    }
     const ys =
       building === "harbor"
         ? [235, 250]
@@ -478,6 +598,28 @@ export function setupGame(content) {
     event.preventDefault();
     const point = view.pick(event);
     if (!point) return;
+    if (orderIntent === "rally") {
+      if (network) {
+        networkUI.request({ kind: "rally", x: point.x, y: point.y });
+        orderIntent = null;
+        refresh();
+        return;
+      }
+      battle.rally = {
+        x: Math.max(25, Math.min(975, point.x)),
+        y: Math.max(25, Math.min(595, point.y)),
+      };
+      orderIntent = null;
+      battle.message =
+        "نُقلت نقطة تجمع الجيش؛ يمكن تحريك الكاميرا إليها من العلم الأخضر";
+      refresh();
+      return;
+    }
+    if (orderIntent === "relocate") {
+      if (tacticalUI.point(point.x, point.y)) orderIntent = null;
+      refresh();
+      return;
+    }
     if (building) {
       if (battle.purchase(building, point.x, point.y)) building = null;
     } else {
@@ -494,8 +636,10 @@ export function setupGame(content) {
   }
   canvas.oncontextmenu = (e) => e.preventDefault();
   content.onkeydown = (e) => {
+    if (tacticalUI?.key(e)) return;
     if (e.key === "Escape") {
       building = null;
+      orderIntent = null;
       shell.classList.remove("maps-open", "commands-open");
       syncDrawers();
       refresh();
@@ -516,23 +660,68 @@ export function setupGame(content) {
       !document.hidden &&
       !content.closest(".window").classList.contains("hidden") &&
       document.querySelector("#lock-screen").classList.contains("hidden");
-    if (visible && !graphicsFailed) battle.update(dt);
+    if (visible && !graphicsFailed && !network) battle.update(dt);
+    if (network) networkUI?.frame(time);
     const events = battle.takeEvents();
     audio.update(battle, events, visible && !graphicsFailed);
     view?.effects(events);
     if (visible) view?.draw(battle);
-    if(battle.status==="playing"&&battle.time-lastAuto>=10){lastAuto=battle.time;persist(true);}
+    if (battle.status === "playing" && battle.time - lastAuto >= 10) {
+      lastAuto = battle.time;
+      persist(true);
+    }
     if (time - lastHud > 150) {
       refresh();
       lastHud = time;
     }
     animation = requestAnimationFrame(frame);
   }
-  start(progress.stage);
-  if(availableSave)text(content.querySelector(".battle-save-status"),"توجد معركة محفوظة؛ اضغط استئناف آخر حفظ لمتابعتها.");
+  tacticalUI = setupCommandCenter(content, {
+    getBattle: () => battle,
+    start,
+    storage,
+    refresh,
+    arm: (value) => {
+      orderIntent = value;
+      building = null;
+    },
+  });
+  const qualitySelect = content.querySelector('[aria-label="جودة الرسومات"]');
+  qualitySelect.value = ["auto", "low", "medium", "high"].includes(
+    qualityChoice,
+  )
+    ? qualityChoice
+    : "auto";
+  qualitySelect.onchange = () => {
+    qualityChoice = qualitySelect.value;
+    view?.setQuality(qualityChoice);
+    try {
+      storage.setItem("myos-quality-v1", qualityChoice);
+    } catch {
+      battle.message = "تغيّرت الجودة؛ تعذّر حفظ التفضيل";
+    }
+  };
+  if (network)
+    networkUI = bindNetworkGame(content, network, {
+      getBattle: () => battle,
+      refresh,
+      onBattle: (next, initial) => {
+        if (initial) start(next.stageIndex, next.map.id, next);
+        else battle = next;
+      },
+    });
+  else start(progress.stage);
+  if (availableSave && !network)
+    text(
+      content.querySelector(".battle-save-status"),
+      "توجد معركة محفوظة؛ اضغط استئناف آخر حفظ لمتابعتها.",
+    );
   animation = requestAnimationFrame(frame);
   return () => {
-    persist(true);window.removeEventListener("pagehide",saveOnLeave);
+    persist(true);
+    window.removeEventListener("pagehide", saveOnLeave);
+    window.removeEventListener("myos:flush-data", saveOnLeave);
+    networkUI?.close();
     stopped = true;
     audio.dispose().catch(() => {});
     document.removeEventListener("visibilitychange", silence);

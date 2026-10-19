@@ -79,7 +79,12 @@ export function initializeSystems(b, options = {}) {
       (m) => m.id === options.mission && m.stages.includes(b.stageIndex),
     ) || MISSIONS[0];
   b.objective = { hold: 0, kills: 0, evacuated: 0 };
-  b.enemy = { cash: 1200, nextDecision: 12, nextOrders: 8 };
+  b.enemy = {
+    cash: 1200,
+    nextDecision: 12,
+    nextOrders: 8,
+    lastHQ: { x: 130, y: b.stageIndex === 2 ? 140 : 320 },
+  };
   b.explored = new Set();
   b.nextExplore = 0;
   b.fog = options.fog !== false;
@@ -196,7 +201,11 @@ export function updateEnemy(b, types) {
   }
   if (b.time >= enemy.nextOrders) {
     enemy.nextOrders = b.time + 6;
-    const enemies = b.entities.filter((e) => e.team === "blue" && e.hp > 0);
+    const enemies = b.entities.filter(
+      (e) => e.team === "blue" && e.hp > 0 && visibleTo(b, e, "red"),
+    );
+    const seenHQ = enemies.find((e) => e.type === "hq");
+    if (seenHQ) enemy.lastHQ = { x: seenHQ.x, y: seenHQ.y };
     for (const unit of b.entities.filter(
       (e) => e.team === "red" && e.speed && e.damage && !e.servicing,
     )) {
@@ -217,7 +226,15 @@ export function updateEnemy(b, types) {
           (e) => e.type === "hq" && unit.targets.includes(e.domain),
         ) ||
         enemies.find((e) => unit.targets.includes(e.domain));
-      if (!target) continue;
+      if (!target) {
+        const destination = enemy.lastHQ || {
+          x: 130,
+          y: b.stageIndex === 2 ? 140 : 320,
+        };
+        unit.order = b.constrain(unit, destination.x, destination.y);
+        unit.route = null;
+        continue;
+      }
       if (role === 1 && unit.x > 620) {
         unit.order = b.constrain(
           unit,
@@ -231,11 +248,15 @@ export function updateEnemy(b, types) {
 }
 export function serviceUnit(b, unit) {
   const bases = b.entities.filter(
-    (e) => e.team === unit.team && ["hq", "supply", "harbor"].includes(e.type),
+    (e) =>
+      e.team === unit.team &&
+      ["hq", "supply", "harbor", "airfield"].includes(e.type) &&
+      (!e.hqMode || e.hqMode === "deployed"),
   );
   const base = bases.sort((a, c) => distance(unit, a) - distance(unit, c))[0];
   if (!base) return;
   unit.servicing = true;
+  unit.tactical = null;
   unit.order = b.constrain(unit, base.x, base.y);
   unit.route = null;
 }
@@ -251,10 +272,15 @@ export function updateLogistics(b, dt) {
     const base = b.entities.find(
       (e) =>
         e.team === unit.team &&
-        ["hq", "supply", "harbor"].includes(e.type) &&
+        ["hq", "supply", "harbor", "airfield"].includes(e.type) &&
+        (!e.hqMode || e.hqMode === "deployed") &&
         distance(e, unit) < 180,
     );
-    if (!base) continue;
+    if (!base) {
+      serviceUnit(b, unit);
+      continue;
+    }
+    if (unit.domain === "air" && (unit.flight ?? 1) > 0.08) continue;
     unit.reload = (unit.reload || 0) + dt;
     if (unit.reload >= 1) {
       unit.reload -= 1;

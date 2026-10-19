@@ -14,7 +14,7 @@ export function setupCloud(content) {
     closed = false,
     epoch = 0;
   const storage = localStorage;
-  content.innerHTML = `<div class="cloud-page"><span class="eyebrow">MYOS CLOUD · OPTIONAL</span><h2>ملاحظاتك وتقدّمك بين أجهزتك</h2><p>المزامنة اختيارية وتحتاج مشروع Supabase خاصًا بك. التطبيق المحلي يعمل دون حساب. يمكن ربط خدمتك من الإعدادات أدناه.</p><details open><summary>إعداد الخدمة</summary><p>أنشئ مشروعًا مجانيًا من لوحة Supabase، ونفّذ ملف <code>supabase/schema.sql</code> المرفق بالمستودع في SQL Editor. فعّل تسجيل الدخول بالبريد وكلمة المرور. <a href="https://github.com/MagdyAqel/MyOS/blob/main/supabase/README.md" target="_blank" rel="noopener noreferrer">افتح دليل الإعداد خطوة بخطوة</a>. أدخل عنوان المشروع والمفتاح العام فقط؛ لا تستخدم service_role أو أي مفتاح سري.</p><form class="cloud-config"><label>عنوان المشروع<input type="url" name="url" placeholder="https://project.supabase.co" required></label><label>مفتاح publishable أو anon العام<input name="key" type="password" autocomplete="off" required></label><button>حفظ إعداد الخدمة</button></form></details><form class="cloud-auth"><h3>تسجيل الدخول</h3><label>البريد الإلكتروني<input type="email" name="email" autocomplete="email" required></label><label>كلمة المرور<input type="password" name="password" autocomplete="current-password" minlength="8" required></label><div><button name="login">دخول</button><button type="button" data-cloud="signup">إنشاء حساب</button><button type="button" data-cloud="logout">خروج</button></div></form><p class="cloud-status" role="status">أدخل إعداد المشروع لبدء الربط. لا تُخزّن كلمات المرور أو رموز الجلسة في النسخ السحابية.</p><section class="cloud-actions"><button data-cloud="inspect">فحص النسخة السحابية</button><button data-cloud="push">رفع نسخة هذا الجهاز</button><button data-cloud="pull">استعادة نسخة السحابة</button><button data-cloud="undo">تراجع عن آخر استعادة</button></section><div class="cloud-confirm hidden"><p></p><button data-cloud="confirm">تأكيد العملية</button><button data-cloud="cancel">إلغاء</button></div><p class="cloud-summary"></p><p class="muted">تُزامَن الملاحظات والملفات النصية وحفظ المعارك وتقدّم المراحل. صور الخلفيات والجلسات وكلمات المرور لا تُرفع. المزامنة يدوية لتتمكن من مراجعة ما سترفعه أو تستعيده. إغلاق هذه النافذة ينهي الجلسة المحلية.</p><button data-cloud="reload" class="hidden">إعادة فتح التطبيق لعرض البيانات المستعادة</button></div>`;
+  content.innerHTML = `<div class="cloud-page"><span class="eyebrow">MYOS CLOUD · OPTIONAL</span><h2>ملاحظاتك وتقدّمك بين أجهزتك</h2><p>المزامنة اختيارية وتحتاج مشروع Supabase خاصًا بك. التطبيق المحلي يعمل دون حساب. يمكن ربط خدمتك من الإعدادات أدناه.</p><details open><summary>إعداد الخدمة</summary><p>أنشئ مشروعًا مجانيًا من لوحة Supabase، ونفّذ ملف <code>supabase/schema.sql</code> المرفق بالمستودع في SQL Editor. فعّل تسجيل الدخول بالبريد وكلمة المرور. <a href="https://github.com/MagdyAqel/MyOS/blob/main/supabase/README.md" target="_blank" rel="noopener noreferrer">افتح دليل الإعداد خطوة بخطوة</a>. أدخل عنوان المشروع والمفتاح العام فقط؛ لا تستخدم service_role أو أي مفتاح سري.</p><form class="cloud-config"><label>عنوان المشروع<input type="url" name="url" placeholder="https://project.supabase.co" required></label><label>مفتاح publishable أو anon العام<input name="key" type="password" autocomplete="off" required></label><button>حفظ إعداد الخدمة</button></form></details><form class="cloud-auth"><h3>تسجيل الدخول</h3><label>البريد الإلكتروني<input type="email" name="email" autocomplete="email" required></label><label>كلمة المرور<input type="password" name="password" autocomplete="current-password" minlength="8" required></label><div><button name="login">دخول</button><button type="button" data-cloud="signup">إنشاء حساب</button><button type="button" data-cloud="logout">خروج</button></div></form><p class="cloud-status" role="status">أدخل إعداد المشروع لبدء الربط. لا تُخزّن كلمات المرور أو رموز الجلسة في النسخ السحابية.</p><section class="cloud-actions"><button data-cloud="inspect">فحص النسخة السحابية</button><button data-cloud="push">رفع نسخة هذا الجهاز</button><button data-cloud="pull">استعادة نسخة السحابة</button><button data-cloud="undo">تراجع عن آخر استعادة</button></section><div class="cloud-confirm hidden"><p></p><button data-cloud="confirm">تأكيد العملية</button><button data-cloud="cancel">إلغاء</button></div><p class="cloud-summary"></p><p class="muted">تُزامَن الملاحظات والملفات النصية والمستندات المنسقة وحفظ المعارك وتقدّم الحملة والمراحل. صور الخلفيات والجلسات وكلمات المرور لا تُرفع. المزامنة يدوية لتتمكن من مراجعة ما سترفعه أو تستعيده. إغلاق هذه النافذة ينهي الجلسة المحلية.</p><button data-cloud="reload" class="hidden">إعادة فتح التطبيق لعرض البيانات المستعادة</button></div>`;
   const config = content.querySelector(".cloud-config"),
     auth = content.querySelector(".cloud-auth"),
     status = content.querySelector(".cloud-status"),
@@ -62,7 +62,7 @@ export function setupCloud(content) {
     }
     const count = snapshotSummary(validateSyncSnapshot(row.data));
     content.querySelector(".cloud-summary").textContent =
-      `السحابة: ${count.notes} ملاحظات · ${count.files} ملفات · ${count.battles} حفظ معارك · الإصدار ${row.revision}`;
+      `السحابة: ${count.notes} ملاحظات · ${count.files} ملفات · ${count.documents} مستندات · ${count.battles} حفظ معارك · الإصدار ${row.revision}`;
   };
   config.onsubmit = (event) => {
     event.preventDefault();
@@ -137,7 +137,7 @@ export function setupCloud(content) {
         throw Error("لا توجد بيانات محلية للرفع");
       pending = { kind: "push", snapshot };
       confirm.querySelector("p").textContent =
-        `سترفع نسخة هذا الجهاز: ${count.notes} ملاحظات و${count.files} ملفات. ستُستبدل بيانات النسخة السحابية عند نجاح الرفع؛ لن تُدمج الملاحظات تلقائيًا.`;
+        `سترفع نسخة هذا الجهاز: ${count.notes} ملاحظات و${count.files} ملفات و${count.documents} مستندات. ستُستبدل بيانات النسخة السحابية عند نجاح الرفع؛ لن تُدمج الملاحظات تلقائيًا.`;
       confirm.classList.remove("hidden");
     });
   content.querySelector('[data-cloud="pull"]').onclick = () =>
@@ -148,7 +148,7 @@ export function setupCloud(content) {
         count = snapshotSummary(snapshot);
       pending = { kind: "pull", snapshot };
       confirm.querySelector("p").textContent =
-        `ستستعيد ${count.notes} ملاحظات و${count.files} ملفات و${count.battles} حفظ معارك. ستُستبدل مجموعات البيانات الموجودة في هذه النسخة، مع الاحتفاظ بنسخة تراجع محلية.`;
+        `ستستعيد ${count.notes} ملاحظات و${count.files} ملفات و${count.documents} مستندات و${count.battles} حفظ معارك. ستُستبدل مجموعات البيانات الموجودة في هذه النسخة، مع الاحتفاظ بنسخة تراجع محلية.`;
       confirm.classList.remove("hidden");
     });
   content.querySelector('[data-cloud="confirm"]').onclick = () =>

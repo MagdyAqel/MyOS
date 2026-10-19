@@ -44,4 +44,17 @@ test("installed production shell, notes and full game reload offline under /MyOS
   await expect(page.locator(".mission-objective")).toContainText("السيطرة");
   await page.locator('[data-game="save"]').click();
   await expect(page.locator(".battle-save-status")).toContainText("تم حفظ");
+  await page.getByRole("button", { name: "إغلاق", exact: true }).click();
+  await page.locator("[data-task=writer]").click();
+  await page
+    .getByRole("textbox", { name: "نص المستند المنسق" })
+    .fill("مستند يعمل دون إنترنت");
+  await page.getByRole("button", { name: "إغلاق", exact: true }).click();
+  await page.locator("[data-task=backup]").click();
+  const download = page.waitForEvent("download");
+  await page.locator("[data-backup=export]").click();
+  expect((await download).suggestedFilename()).toMatch(/MyOS-backup/);
+  await page.getByRole("button", { name: "إغلاق", exact: true }).click();
+  await page.locator("[data-task=media]").click();
+  await expect(page.getByLabel("فتح صورة أو ملف وسائط أو PDF")).toBeVisible();
 });

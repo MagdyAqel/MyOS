@@ -1,11 +1,17 @@
+import { detailModel, QUALITY, resolveQuality } from "./model-details.js";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { mapFor } from "./maps.js";
 import { enhanceEnvironment } from "./environment3d.js";
-import {createFog} from "./fog3d.js";
+import { createFog } from "./fog3d.js";
 
 // All models are built locally from geometry; no downloaded textures or game assets.
-export function createBattleScene(canvas, stage, map = mapFor(0)) {
+export function createBattleScene(
+  canvas,
+  stage,
+  map = mapFor(0),
+  options = {},
+) {
   if (
     map.stage !==
     ["desert", "highland", "coast", "abyss"].indexOf(stage.terrain)
@@ -15,13 +21,14 @@ export function createBattleScene(canvas, stage, map = mapFor(0)) {
     );
   const renderer = new THREE.WebGLRenderer({
     canvas,
-    antialias: true,
+    antialias: options.quality !== "low",
     alpha: false,
     powerPreference: "high-performance",
   });
   const touchDevice = matchMedia("(pointer: coarse)").matches;
-  renderer.setPixelRatio(Math.min(devicePixelRatio, touchDevice ? 1.15 : 1.6));
-  renderer.shadowMap.enabled = true;
+  let quality = resolveQuality(options.quality, touchDevice);
+  renderer.setPixelRatio(Math.min(devicePixelRatio, QUALITY[quality].ratio));
+  renderer.shadowMap.enabled = QUALITY[quality].shadows;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -83,7 +90,7 @@ export function createBattleScene(canvas, stage, map = mapFor(0)) {
   const sun = new THREE.DirectionalLight(underwater ? 0x58c4f8 : 0xfff0ca, 3);
   sun.position.set(-350, 750, 200);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(touchDevice ? 512 : 1024, touchDevice ? 512 : 1024);
+  sun.shadow.mapSize.set(QUALITY[quality].shadow, QUALITY[quality].shadow);
   Object.assign(sun.shadow.camera, {
     left: -650,
     right: 650,
@@ -212,7 +219,7 @@ export function createBattleScene(canvas, stage, map = mapFor(0)) {
   scene.add(grid);
   grid.visible = false;
   if (water) water.visible = false;
-  const fogOfWar=createFog(scene,stage);
+  const fogOfWar = createFog(scene, stage);
   const environment = enhanceEnvironment(scene, terrain, stage, map);
   function label(text, color) {
     const c = document.createElement("canvas");
@@ -237,7 +244,12 @@ export function createBattleScene(canvas, stage, map = mapFor(0)) {
   }
   function createModel(e) {
     const g = new THREE.Group(),
-      color = e.team === "blue" ? "#3b91ba" :e.team==="neutral"?"#d4b26a": "#bf554a",
+      color =
+        e.team === "blue"
+          ? "#3b91ba"
+          : e.team === "neutral"
+            ? "#d4b26a"
+            : "#bf554a",
       light = e.team === "blue" ? "#93deed" : "#ffc89f",
       dark = "#263640";
     g.userData.entityId = e.id;
@@ -286,8 +298,21 @@ export function createBattleScene(canvas, stage, map = mapFor(0)) {
         cylinder(g, 1.5, 24, dark, 0, 35, -9);
         cylinder(g, 7, 5, dark, 0, 8, 22);
         box(g, 3, 3, 22, light, 0, 12, 31);
+        const gun = new THREE.Group();
+        gun.position.z = 22;
+        for (const part of g.children.slice(-2)) {
+          part.position.z -= 22;
+          gun.add(part);
+        }
+        g.add(gun);
+        g.userData.weaponPivot = gun;
       }
-    } else if(e.type==="convoy"){box(g,26,16,48,color,0,14,0);box(g,24,18,17,"#7ca4b1",0,15,29);for(const x of [-17,17])for(const z of [-16,16])cylinder(g,6,5,"#25333a",x,6,z).rotation.z=Math.PI/2;
+    } else if (e.type === "convoy") {
+      box(g, 26, 16, 48, color, 0, 14, 0);
+      box(g, 24, 18, 17, "#7ca4b1", 0, 15, 29);
+      for (const x of [-17, 17])
+        for (const z of [-16, 16])
+          cylinder(g, 6, 5, "#25333a", x, 6, z).rotation.z = Math.PI / 2;
     } else if (e.type === "tank") {
       box(g, 30, 10, 38, color, 0, 8, 0);
       box(g, 8, 12, 42, dark, -19, 6, 0);
@@ -298,7 +323,11 @@ export function createBattleScene(canvas, stage, map = mapFor(0)) {
       }
       box(g, 20, 9, 21, color, 0, 17, -2);
       box(g, 4, 4, 32, light, 0, 19, 20);
-    } else if (e.type === "soldier"||e.type==="survivor") {
+      const turret = new THREE.Group();
+      for (const part of g.children.slice(-2)) turret.add(part);
+      g.add(turret);
+      g.userData.weaponPivot = turret;
+    } else if (e.type === "soldier" || e.type === "survivor") {
       cylinder(g, 5, 12, color, 0, 12, 0);
       mesh(new THREE.SphereGeometry(4, 8, 8), "#d0b18a", g, 0, 22, 0);
       cylinder(g, 4.5, 4, dark, 0, 25, 0);
@@ -358,6 +387,7 @@ export function createBattleScene(canvas, stage, map = mapFor(0)) {
         }
       }
     }
+    g.userData.detail = detailModel(g, e, { box, cylinder, mesh });
     const ring = new THREE.Mesh(
       new THREE.RingGeometry(e.radius + 8, e.radius + 11, 40),
       new THREE.MeshBasicMaterial({
@@ -386,6 +416,11 @@ export function createBattleScene(canvas, stage, map = mapFor(0)) {
     models.set(e.id, g);
     return g;
   }
+  const rallyFlag = new THREE.Group();
+  cylinder(rallyFlag, 1.5, 45, "#afd9bc", 0, 22, 0);
+  box(rallyFlag, 20, 13, 1, "#55bd85", 10, 39, 0);
+  scene.add(rallyFlag);
+  rallyFlag.visible = false;
   const effectGeo = new THREE.BufferGeometry();
   const effectPositions = new THREE.Float32BufferAttribute(
     new Float32Array(3072),
@@ -397,6 +432,7 @@ export function createBattleScene(canvas, stage, map = mapFor(0)) {
   const lines = new THREE.LineSegments(effectGeo, effectMat);
   lines.frustumCulled = false;
   scene.add(lines);
+  canvas.dataset.quality = quality;
   let lastOrientation = null;
   let lastWidth = 0,
     lastHeight = 0;
@@ -430,6 +466,13 @@ export function createBattleScene(canvas, stage, map = mapFor(0)) {
         home();
       }
     }
+    rallyFlag.visible = Boolean(battle.rally);
+    if (battle.rally)
+      rallyFlag.position.set(
+        battle.rally.x - 500,
+        underwater ? -12 : 0,
+        battle.rally.y - 310,
+      );
     const living = new Set(battle.entities.map((e) => e.id));
     for (const [id, model] of models)
       if (!living.has(id)) {
@@ -438,8 +481,16 @@ export function createBattleScene(canvas, stage, map = mapFor(0)) {
       }
     for (const e of battle.entities) {
       const g = models.get(e.id) || createModel(e);
-      g.visible=battle.isVisible?battle.isVisible(e):true;
-      g.position.set(e.x - 500, altitude(e.domain, battle.time), e.y - 310);
+      g.visible = battle.isVisible ? battle.isVisible(e) : true;
+      const height =
+        e.type === "fighter" || e.type === "bomber"
+          ? 8 + (e.flight ?? 1) * (flightHeight - 8)
+          : e.type === "submarine"
+            ? underwater
+              ? 22 - (e.depth ?? 1) * 10
+              : -(e.depth ?? 1) * 14
+            : altitude(e.domain, battle.time);
+      g.position.set(e.x - 500, height, e.y - 310);
       if (e.speed)
         g.rotation.y =
           e.heading ?? (e.team === "blue" ? Math.PI / 2 : -Math.PI / 2);
@@ -447,6 +498,10 @@ export function createBattleScene(canvas, stage, map = mapFor(0)) {
         g.position.y += Math.sin(battle.time * 2 + e.id) * 2;
       g.userData.ring.visible = battle.selected.has(e.id);
       g.userData.hp.scale.x = Math.max(0.01, e.hp / e.maxHp);
+      g.userData.detail.update(e, battle.time, quality);
+      if (g.userData.weaponPivot)
+        g.userData.weaponPivot.rotation.y =
+          (e.aim ?? e.heading ?? g.rotation.y) - g.rotation.y;
     }
     const vertices = [];
     for (const e of battle.effects)
@@ -463,7 +518,8 @@ export function createBattleScene(canvas, stage, map = mapFor(0)) {
     effectGeo.setDrawRange(0, Math.min(vertices.length, 3072) / 3);
     if (water)
       water.material.opacity = 0.2 + Math.sin(battle.time * 1.5) * 0.06;
-    environment.animate(battle);fogOfWar.draw(battle);
+    environment.animate(battle);
+    fogOfWar.draw(battle);
     for (const entity of battle.entities) {
       const model = models.get(entity.id);
       if (entity.firing > 0 && model) {
@@ -484,7 +540,10 @@ export function createBattleScene(canvas, stage, map = mapFor(0)) {
     );
     raycaster.setFromCamera(mouse, camera);
     const hits = raycaster
-      .intersectObjects([...models.values()].filter(m=>m.visible), true)
+      .intersectObjects(
+        [...models.values()].filter((m) => m.visible),
+        true,
+      )
       .filter((h) => h.object.type === "Mesh");
     if (hits.length) {
       let model = hits[0].object;
@@ -512,6 +571,7 @@ export function createBattleScene(canvas, stage, map = mapFor(0)) {
     };
   }
   function disposeModel(model) {
+    model.userData.detail?.dispose();
     scene.remove(model);
     model.traverse((o) => {
       if (!o.isSprite) o.geometry?.dispose();
@@ -523,7 +583,8 @@ export function createBattleScene(canvas, stage, map = mapFor(0)) {
     });
   }
   function dispose(releaseContext = false) {
-    environment.dispose();fogOfWar.dispose();
+    environment.dispose();
+    fogOfWar.dispose();
     controls.dispose();
     scene.traverse((o) => {
       if (!o.isSprite) o.geometry?.dispose();
@@ -533,16 +594,29 @@ export function createBattleScene(canvas, stage, map = mapFor(0)) {
     effectMat.dispose();
     grid.material.dispose();
     water?.material.dispose();
-    for (const model of models.values())
+    for (const model of models.values()) {
+      model.userData.detail?.dispose();
       model.traverse((o) => {
         if (o.material?.isSpriteMaterial || o.geometry?.type === "RingGeometry")
           o.material.dispose();
       });
+    }
     renderer.dispose();
     if (releaseContext) renderer.forceContextLoss();
     models.clear();
   }
   return {
+    setQuality(value) {
+      quality = resolveQuality(value, touchDevice);
+      const preset = QUALITY[quality];
+      renderer.setPixelRatio(Math.min(devicePixelRatio, preset.ratio));
+      renderer.shadowMap.enabled = preset.shadows;
+      sun.shadow.mapSize.set(preset.shadow, preset.shadow);
+      sun.shadow.map?.dispose();
+      sun.shadow.map = null;
+      lastWidth = 0;
+      canvas.dataset.quality = quality;
+    },
     draw,
     effects: environment.events,
     focusPoint(x, y) {

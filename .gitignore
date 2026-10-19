@@ -2,3 +2,12 @@ node_modules/
 dist/
 test-results/
 playwright-report/
+
+.wrangler/
+multiplayer/.wrangler/
+.dev.vars
+multiplayer/.dev.vars
+
+.wrangler-user/
+
+test-results-multiplayer/

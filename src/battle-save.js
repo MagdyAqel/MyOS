@@ -1,3 +1,10 @@
+import {
+  checkTactics,
+  snapshotTactics,
+  snapshotUnitTactics,
+  restoreUnitTactics,
+  restoreTactics,
+} from "./tactics-save.js";
 import { Battle, TYPES } from "./battle.js";
 import { mapFor } from "./maps.js";
 import { DIFFICULTIES, MISSIONS } from "./systems.js";
@@ -8,6 +15,7 @@ const number = (v, max = 1e8) =>
 export function snapshotBattle(b) {
   return {
     version: 1,
+    ...snapshotTactics(b),
     savedAt: Date.now(),
     stage: b.stageIndex,
     map: b.map.id,
@@ -26,6 +34,7 @@ export function snapshotBattle(b) {
     explored: [...b.explored],
     selected: [...b.selected],
     entities: b.entities.map((e) => ({
+      ...snapshotUnitTactics(e),
       id: e.id,
       type: e.type,
       team: e.team,
@@ -92,6 +101,7 @@ export function restoreBattle(raw) {
     !["hold", "kills", "evacuated"].every((k) => number(data.objective[k], 1e7))
   )
     throw Error("حالة المهمة غير صالحة");
+  checkTactics(data);
   const ids = new Set();
   for (const e of data.entities) {
     if (
@@ -104,7 +114,13 @@ export function restoreBattle(raw) {
       ids.has(e.id) ||
       !number(e.x, 1000) ||
       !number(e.y, 620) ||
-      !number(e.hp, TYPES[e.type].hp) ||
+      !number(
+        e.hp,
+        Math.round(
+          TYPES[e.type].hp *
+            (1 + (e.team === "blue" ? data.upgrades?.armor || 0 : 0) * 0.1),
+        ),
+      ) ||
       !number(e.ammo, 1000) ||
       !number(e.cd, 10) ||
       !number(e.reload, 2) ||
@@ -126,11 +142,14 @@ export function restoreBattle(raw) {
     difficulty: data.difficulty,
     mission: data.mission,
     fog: data.fog !== false,
+    upgrades: data.upgrades,
+    operationId: data.operationId,
   });
   b.entities = [];
   b.nextId = 1;
   for (const e of data.entities) {
     const entity = b.add(e.type, e.team, e.x, e.y);
+    restoreUnitTactics(entity, e);
     entity.id = e.id;
     entity.hp = e.hp;
     entity.ammo = Math.min(entity.maxAmmo, e.ammo);
@@ -147,6 +166,7 @@ export function restoreBattle(raw) {
           : null
       : null;
   }
+  restoreTactics(b, data);
   b.nextId = Math.max(...ids) + 1;
   for (const key of [
     "time",
@@ -162,6 +182,12 @@ export function restoreBattle(raw) {
     cash: data.enemy.cash,
     nextDecision: data.enemy.nextDecision,
     nextOrders: data.enemy.nextOrders,
+    lastHQ:
+      data.enemy.lastHQ &&
+      number(data.enemy.lastHQ.x, 1000) &&
+      number(data.enemy.lastHQ.y, 620)
+        ? { x: data.enemy.lastHQ.x, y: data.enemy.lastHQ.y }
+        : { x: 130, y: data.stage === 2 ? 140 : 320 },
   };
   b.objective = {
     hold: data.objective.hold,

@@ -1,7 +1,25 @@
 import { STAGES } from "./campaign.js";
 import { mapFor, blocked } from "./maps.js";
 import { moveUnit, clearShot, walkable } from "./navigation.js";
-import {EXTRA_TYPES,initializeSystems,visibleTo,updateExploration,updateEnemy,updateLogistics,advanceMission,missionOutcome,serviceUnit,DIFFICULTIES} from "./systems.js";
+import {
+  EXTRA_TYPES,
+  initializeSystems,
+  visibleTo,
+  updateExploration,
+  updateEnemy,
+  updateLogistics,
+  advanceMission,
+  missionOutcome,
+  serviceUnit,
+  DIFFICULTIES,
+} from "./systems.js";
+import {
+  initializeTactics,
+  updateTactics,
+  formationPoint,
+  normalizeUpgrades,
+  issueTacticalOrder,
+} from "./tactics.js";
 export const WIDTH = 1000,
   HEIGHT = 620;
 export const TYPES = {
@@ -146,7 +164,7 @@ export const TYPES = {
 };
 const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 export class Battle {
-  constructor(stage = 0, mapId, options={}) {
+  constructor(stage = 0, mapId, options = {}) {
     this.stageIndex = Number.isInteger(stage) && STAGES[stage] ? stage : 0;
     this.stage = STAGES[this.stageIndex];
     this.map = mapFor(this.stageIndex, mapId);
@@ -163,6 +181,7 @@ export class Battle {
     this.selected = new Set();
     this.effects = [];
     this.entities = [];
+    this.upgrades = normalizeUpgrades(options.upgrades);
     this.message = this.stage.description;
     const navy = this.stageIndex >= 2,
       abyss = this.stageIndex === 3;
@@ -189,10 +208,20 @@ export class Battle {
       this.add("submarine", "blue", 230, 420);
       this.add(abyss ? "submarine" : "destroyer", "blue", 180, 500);
     }
-    initializeSystems(this,options);
+    initializeSystems(this, options);
+    initializeTactics(this, options);
   }
-  isVisible(entity,team="blue"){return visibleTo(this,entity,team);}
-  serviceSelected(){for(const unit of this.entities.filter(e=>this.selected.has(e.id)&&e.damage&&e.speed))serviceUnit(this,unit);this.message="عودة الوحدات للصيانة وإعادة التسليح؛ الإصلاح يستهلك الموارد";}
+  isVisible(entity, team = "blue") {
+    return visibleTo(this, entity, team);
+  }
+  serviceSelected() {
+    for (const unit of this.entities.filter(
+      (e) => this.selected.has(e.id) && e.damage && e.speed,
+    ))
+      serviceUnit(this, unit);
+    this.message =
+      "عودة الوحدات للصيانة وإعادة التسليح؛ الإصلاح يستهلك الموارد";
+  }
   add(type, team, x, y) {
     const e = {
       ...TYPES[type],
@@ -204,9 +233,29 @@ export class Battle {
       maxHp: TYPES[type].hp,
       cd: 0,
       order: null,
-      maxAmmo:({soldier:90,tank:18,fighter:12,bomber:8,destroyer:24,submarine:12})[type]||0,
+      maxAmmo:
+        {
+          soldier: 90,
+          tank: 18,
+          fighter: 12,
+          bomber: 8,
+          destroyer: 24,
+          submarine: 12,
+        }[type] || 0,
     };
-    e.ammo=e.maxAmmo;
+    if (team === "blue") {
+      e.hp = e.maxHp = Math.round(e.hp * (1 + this.upgrades.armor * 0.1));
+      if (e.damage)
+        e.damage = Math.round(e.damage * (1 + this.upgrades.weapons * 0.08));
+      e.maxAmmo = Math.round(e.maxAmmo * (1 + this.upgrades.logistics * 0.2));
+    }
+    e.ammo = e.maxAmmo;
+    if (e.domain === "air") e.flight = 1;
+    if (type === "submarine") e.depth = 1;
+    if (type === "hq") {
+      e.hqMode = "deployed";
+      e.hqTimer = 0;
+    }
     if (type === "hq" && this.stageIndex === 3) {
       e.domain = "sub";
       e.name = "محطة قيادة الأعماق";
@@ -229,7 +278,8 @@ export class Battle {
   }
   has(type) {
     return this.entities.some(
-      (e) => e.team === "blue" && e.type === type && e.hp > 0,
+      (e) =>
+        e.team === (this.actorTeam || "blue") && e.type === type && e.hp > 0,
     );
   }
   allowed(type) {
@@ -251,7 +301,17 @@ export class Battle {
     };
   }
   purchase(type, x, y) {
+    const team = this.actorTeam || "blue",
+      wallet = team === "blue" ? this : this.enemy;
     if (this.status !== "playing" || this.paused) return false;
+    if (
+      this.entities.some(
+        (e) => e.type === "hq" && e.team === team && e.hqMode !== "deployed",
+      )
+    ) {
+      this.message = "ينتظر البناء والإنتاج انتشار مركز القيادة";
+      return false;
+    }
     const spec = TYPES[type];
     if (!spec?.cost || !this.allowed(type)) {
       this.message = "هذه الوحدة غير متاحة في المرحلة الحالية";
@@ -265,24 +325,26 @@ export class Battle {
       this.message = "تحتاج إلى محطة طاقة";
       return false;
     }
-    if (this.cash < spec.cost) {
+    if (wallet.cash < spec.cost) {
       this.message = "الموارد غير كافية";
       return false;
     }
     if (spec.speed) {
       if (
-        this.entities.filter((e) => e.team === "blue" && e.speed).length >= 40
+        this.entities.filter((e) => e.team === team && e.speed && e.damage)
+          .length >= 40
       ) {
         this.message = "الحد الأقصى ٤٠ وحدة";
         return false;
       }
       const producer = this.entities.find(
-        (e) => e.team === "blue" && e.type === spec.needs,
+        (e) => e.team === team && e.type === spec.needs,
       );
-      const n = this.entities.filter(
-        (e) => e.speed && e.team === "blue",
-      ).length;
-      x = Math.min(560, producer.x + 70 + (n % 3) * 20);
+      const n = this.entities.filter((e) => e.speed && e.team === team).length;
+      x =
+        team === "red"
+          ? Math.max(440, producer.x - 70 - (n % 3) * 20)
+          : Math.min(560, producer.x + 70 + (n % 3) * 20);
       y =
         producer.y +
         (spec.domain === "sea" || spec.domain === "sub"
@@ -313,12 +375,15 @@ export class Battle {
       if (
         !Number.isFinite(x) ||
         !Number.isFinite(y) ||
-        x < spec.radius + 10 ||
-        x > 550 ||
+        x < (team === "red" ? 450 : spec.radius + 10) ||
+        x > (team === "red" ? WIDTH - spec.radius - 10 : 550) ||
         y < spec.radius + 10 ||
         y > HEIGHT - spec.radius - 10
       ) {
-        this.message = "اختر مساحة داخل النصف الأيسر من الخريطة";
+        this.message =
+          team === "red"
+            ? "اختر مساحة داخل النصف الأيمن من الخريطة"
+            : "اختر مساحة داخل النصف الأيسر من الخريطة";
         return false;
       }
       if (
@@ -345,8 +410,11 @@ export class Battle {
         return false;
       }
     }
-    this.cash -= spec.cost;
-    this.add(type, "blue", x, y);
+    wallet.cash -= spec.cost;
+    const recruited = this.add(type, team, x, y);
+    if (recruited.domain === "air") recruited.flight = 0;
+    if (recruited.speed && this.rally)
+      recruited.order = this.constrain(recruited, this.rally.x, this.rally.y);
     this.emit(spec.speed ? "train" : "build", { type, x, y });
     this.message = `تم تجهيز ${spec.name}`;
     return true;
@@ -354,7 +422,7 @@ export class Battle {
   selectAll() {
     this.selected = new Set(
       this.entities
-        .filter((e) => e.team === "blue" && e.speed)
+        .filter((e) => e.team === "blue" && e.speed && e.damage)
         .map((e) => e.id),
     );
   }
@@ -374,20 +442,30 @@ export class Battle {
       !Number.isFinite(y)
     )
       return;
+    if (this.commandMode !== "move") {
+      issueTacticalOrder(this, this.commandMode, x, y);
+      return;
+    }
     const enemy = this.entities.find(
-      (e) => e.team === "red" && distance(e, { x, y }) < e.radius + 16,
+      (e) =>
+        e.team === (this.actorTeam === "red" ? "blue" : "red") &&
+        (!this.multiplayer || this.isVisible(e, this.actorTeam || "blue")) &&
+        distance(e, { x, y }) < e.radius + 16,
     );
     let i = 0,
       unsupported = 0;
     for (const unit of this.entities.filter((e) => this.selected.has(e.id))) {
-      if (enemy && !(unit.targets||[]).includes(enemy.domain)) {
+      if (enemy && !(unit.targets || []).includes(enemy.domain)) {
         unsupported++;
         continue;
       }
       unit.route = null;
+      unit.tactical = null;
+      unit.servicing = false;
+      const point = formationPoint(this, i, this.selected.size, x, y);
       unit.order = enemy
         ? { target: enemy.id }
-        : this.constrain(unit, x + (i % 3) * 20, y + Math.floor(i / 3) * 20);
+        : this.constrain(unit, point.x, point.y);
       i++;
     }
     if (i) this.emit("order", { x, y });
@@ -408,7 +486,11 @@ export class Battle {
     )
       return;
     this.time += dt;
-    updateEnemy(this,TYPES);updateLogistics(this,dt);advanceMission(this,dt);updateExploration(this);
+    updateTactics(this, dt);
+    if (!this.multiplayer) updateEnemy(this, TYPES);
+    updateLogistics(this, dt);
+    advanceMission(this, dt);
+    updateExploration(this);
     this.income += dt;
     while (this.income >= 5) {
       this.income -= 5;
@@ -417,8 +499,29 @@ export class Battle {
           (e) => e.type === "supply" && e.team === "blue" && e.hp > 0,
         ).length * 180;
     }
-    if(this.incomeEnemy===undefined)this.incomeEnemy=0;this.incomeEnemy+=dt;while(this.incomeEnemy>=5){this.incomeEnemy-=5;this.enemy.cash+=(40+140*this.entities.filter(e=>e.team==="red"&&e.type==="supply").length)*DIFFICULTIES[this.difficulty].income;}
-    if (this.time >= this.nextWave && this.wave < this.stage.waves) {
+    if (this.incomeEnemy === undefined) this.incomeEnemy = 0;
+    this.incomeEnemy += dt;
+    while (this.incomeEnemy >= 5) {
+      this.incomeEnemy -= 5;
+      if (this.multiplayer) {
+        this.enemy.cash +=
+          180 *
+          this.entities.filter((e) => e.team === "red" && e.type === "supply")
+            .length;
+        continue;
+      }
+      this.enemy.cash +=
+        (40 +
+          140 *
+            this.entities.filter((e) => e.team === "red" && e.type === "supply")
+              .length) *
+        DIFFICULTIES[this.difficulty].income;
+    }
+    if (
+      !this.multiplayer &&
+      this.time >= this.nextWave &&
+      this.wave < this.stage.waves
+    ) {
       this.wave++;
       this.emit("wave", { wave: this.wave });
       this.nextWave += this.stage.interval;
@@ -439,12 +542,21 @@ export class Battle {
     }
     for (const unit of this.entities) {
       if (unit.hp <= 0 || !unit.damage) continue;
-      if (unit.team === "blue" && unit.type === "turret" && !this.has("power"))
+      if (
+        unit.type === "turret" &&
+        (unit.team === "blue" || this.multiplayer) &&
+        !this.entities.some(
+          (e) => e.type === "power" && e.team === unit.team && e.hp > 0,
+        )
+      )
         continue;
       unit.cd = Math.max(0, unit.cd - dt);
       const opponents = this.entities.filter(
         (e) =>
-          e.team !== unit.team &&e.team!=="neutral"&& e.hp > 0 && unit.targets.includes(e.domain),
+          e.team !== unit.team &&
+          e.team !== "neutral" &&
+          e.hp > 0 &&
+          unit.targets.includes(e.domain),
       );
       const ordered = unit.order?.target
         ? opponents.find((e) => e.id === unit.order.target)
@@ -463,14 +575,34 @@ export class Battle {
         clearShot(this.map, unit, ordered)
           ? ordered
           : nearby;
-      if (target&&(!unit.speed||unit.ammo>0)&&!unit.servicing) {
+      if (target)
+        unit.velocity = Math.max(
+          0,
+          (unit.velocity || 0) - unit.speed * dt * 2 || 0,
+        );
+      if (
+        target &&
+        (!unit.speed || unit.ammo > 0) &&
+        !unit.servicing &&
+        (unit.domain !== "air" || (unit.flight ?? 1) > 0.65)
+      ) {
         if (unit.cd <= 0) {
           target.hp -= unit.damage;
-          if(unit.speed)unit.ammo--;
+          if (unit.team === "blue") {
+            this.stats.shots++;
+            this.stats.damage += unit.damage;
+          }
+          if (this.multiplayer && unit.team === "red") {
+            this.statsRed.shots++;
+            this.statsRed.damage += unit.damage;
+          }
+          if (unit.speed) unit.ammo--;
           unit.cd = unit.cooldown;
           unit.firing = 0.2;
           unit.aim = Math.atan2(target.x - unit.x, target.y - unit.y);
           this.emit("shot", {
+            unit: unit.id,
+            team: unit.team,
             type: unit.type,
             x: unit.x,
             y: unit.y,
@@ -495,7 +627,14 @@ export class Battle {
         const destination =
           ordered ||
           (unit.order?.x !== undefined ? unit.order : null) ||
-          (unit.team === "red" ? enemyHQ || opponents[0] : null);
+          (unit.team === "red" && !this.multiplayer
+            ? enemyHQ && this.isVisible(enemyHQ, "red")
+              ? enemyHQ
+              : this.enemy.lastHQ || {
+                  x: 130,
+                  y: this.stageIndex === 2 ? 140 : 320,
+                }
+            : null);
         if (destination) {
           const point = this.constrain(unit, destination.x, destination.y);
           if (moveUnit(unit, point, this.map, dt) && !ordered)
@@ -505,7 +644,20 @@ export class Battle {
     }
     for (const entity of this.entities) {
       entity.firing = Math.max(0, (entity.firing || 0) - dt);
-      if(entity.hp<=0&&entity.team==="red"&&["fighter","bomber"].includes(entity.type))this.objective.kills++;
+      if (entity.hp <= 0 && entity.team === "red") {
+        this.stats.kills++;
+        if (this.multiplayer && entity.speed) this.statsRed.losses++;
+      }
+      if (entity.hp <= 0 && entity.team === "blue" && this.multiplayer)
+        this.statsRed.kills++;
+      if (entity.hp <= 0 && entity.team === "blue" && entity.speed)
+        this.stats.losses++;
+      if (
+        entity.hp <= 0 &&
+        entity.team === "red" &&
+        ["fighter", "bomber"].includes(entity.type)
+      )
+        this.objective.kills++;
       if (entity.hp <= 0)
         this.emit("explosion", {
           x: entity.x,
@@ -519,7 +671,14 @@ export class Battle {
       [...this.selected].filter((id) => this.entities.some((e) => e.id === id)),
     );
     this.effects = this.effects.filter((e) => (e.life -= dt) > 0);
-    const outcome=!this.has('hq')?'lost':missionOutcome(this);
-    if(outcome){this.status=outcome;this.emit(outcome==='won'?'victory':'defeat');this.message=outcome==='won'?'انتصار! اكتملت أهداف المهمة.':'انتهت المهمة. أعد المحاولة بخطة أقوى.';}
+    const outcome = !this.has("hq") ? "lost" : missionOutcome(this);
+    if (outcome) {
+      this.status = outcome;
+      this.emit(outcome === "won" ? "victory" : "defeat");
+      this.message =
+        outcome === "won"
+          ? "انتصار! اكتملت أهداف المهمة."
+          : "انتهت المهمة. أعد المحاولة بخطة أقوى.";
+    }
   }
 }
