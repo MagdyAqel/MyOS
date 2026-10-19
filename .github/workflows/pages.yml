@@ -22,8 +22,8 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci --no-audit --no-fund
-      - name: Test strategy simulation
-        run: node --test tests/battle.unit.js
+      - name: Test simulation and persistent storage
+        run: node --test tests/*.unit.js
       - run: npm run build
       - uses: actions/upload-pages-artifact@v3
         with:

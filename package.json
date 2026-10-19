@@ -1,16 +1,19 @@
 {
   "name": "myos-desktop",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "test": "node --test tests/battle.unit.js && playwright test"
+    "test": "node --test tests/*.unit.js && playwright test"
   },
   "devDependencies": {
-    "vite": "7.2.2",
-    "@playwright/test": "1.56.1"
+    "@playwright/test": "1.56.1",
+    "vite": "7.2.2"
+  },
+  "dependencies": {
+    "three": "0.180.0"
   }
 }

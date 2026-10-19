@@ -1,7 +1,8 @@
+import { enterDesktop } from './helpers.js';
 import { test, expect } from '@playwright/test';
 test('browser navigation, safe URLs and embedded content',async({page})=>{
  await page.route('https://example.com/**',route=>route.fulfill({contentType:'text/html',body:'<h1>Embedded test page</h1>'}));
- await page.goto('/');await page.locator('.desktop-icons [data-open="browser"]').click();
+ await enterDesktop(page);await page.locator('.desktop-icons [data-open="browser"]').click();
  const address=page.getByRole('textbox',{name:'عنوان الموقع'});
  await address.fill('example.com');await page.getByRole('button',{name:'انتقال',exact:true}).click();
  await expect(page.frameLocator('.browser-frame').getByRole('heading')).toHaveText('Embedded test page');
@@ -14,9 +15,9 @@ test('browser navigation, safe URLs and embedded content',async({page})=>{
 });
 test('build, train, command, pause and reset the RTS mission',async({page})=>{
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
- await page.goto('/');await page.locator('.desktop-icons [data-open="strategy"]').click();
+ await enterDesktop(page);await page.locator('.desktop-icons [data-open="strategy"]').click();
  const canvas=page.locator('canvas');await expect(canvas).toBeVisible();
- const place=async(type,x,y)=>{await page.locator(`[data-build="${type}"]`).click();const box=await canvas.boundingBox();await canvas.click({position:{x:x/1000*box.width,y:y/620*box.height}});};
+ const place=async(type)=>{await page.locator(`[data-build="${type}"]`).click();await page.locator('[data-game="autoplace"]').click();};
  await expect(page.locator('[data-train="tank"]')).toBeDisabled();
  await place('supply',320,150);await expect(page.locator('.rts-message')).toContainText('تم تجهيز مركز إمداد');
  await place('power',320,450);await place('barracks',430,150);
@@ -31,7 +32,7 @@ test('build, train, command, pause and reset the RTS mission',async({page})=>{
  expect(errors).toEqual([]);
 });
 test('new apps remain usable on a narrow phone',async({page})=>{
- await page.setViewportSize({width:390,height:844});await page.goto('/');
+ await page.setViewportSize({width:390,height:844});await enterDesktop(page);
  await page.locator('.desktop-icons [data-open="browser"]').click();
  await expect(page.getByRole('textbox',{name:'عنوان الموقع'})).toBeVisible();
  await page.getByRole('button',{name:'إغلاق',exact:true}).click();

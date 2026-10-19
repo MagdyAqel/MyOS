@@ -1,3 +1,4 @@
+import './apps.css';
 export function setupBrowser(content) {
   content.innerHTML = `
     <div class="browser-app">

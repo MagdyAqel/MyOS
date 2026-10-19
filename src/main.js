@@ -1,13 +1,14 @@
 import './style.css';
 import { setupBrowser } from './browser.js';
-import { setupGame } from './game.js';
+import { setupNotes } from './notes.js';
+import { bootDesktop, DEVELOPER } from './boot.js';
 
 const apps = [
   {id:'files', name:'مستكشف الملفات', icon:'📁', color:'#ffcb55'},
   {id:'notes', name:'المفكرة', icon:'📝', color:'#92cfff'},
   {id:'calculator', name:'الحاسبة', icon:'▦', color:'#b9c8de'},
   {id:'browser', name:'المتصفح', icon:'🌐', color:'#68c9f3'},
-  {id:'strategy', name:'قيادة الصحراء', icon:'🎖', color:'#f5cc83'},
+  {id:'strategy', name:'قيادة الأفق 3D', icon:'🎖', color:'#f5cc83'},
   {id:'settings', name:'الإعدادات', icon:'⚙', color:'#adc7df'},
   {id:'about', name:'حول MyOS', icon:'◈', color:'#80cfff'},
 ];
@@ -21,6 +22,7 @@ root.innerHTML = `
   <div class="bloom" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
   <header class="desktop-heading"><span class="eyebrow">YOUR SPACE, REIMAGINED</span><h1>مساحة لكل أفكارك.</h1><p>أهلًا بك في MyOS</p></header>
   <nav class="desktop-icons" aria-label="تطبيقات سطح المكتب">${apps.map(a=>`<button data-open="${a.id}" aria-label="${a.name}"><span class="app-icon" style="--icon:${a.color}">${a.icon}</span><span>${a.name}</span></button>`).join('')}</nav>
+  <div class="developer-credit" dir="ltr">${DEVELOPER}</div>
   <div id="windows"></div>
   <section id="start" class="glass hidden" aria-label="قائمة ابدأ"><input id="search" placeholder="ابحث عن تطبيقاتك" aria-label="البحث عن تطبيق"><div class="section-label"><strong>التطبيقات المثبتة</strong><span>كل ما تحتاجه</span></div><div id="app-grid"></div><div class="recommend"><strong>ابدأ شيئًا رائعًا</strong><p>دوّن فكرة، رتّب ملفاتك، أو اجعل هذه المساحة لك.</p><button data-open="notes">افتح المفكرة ←</button></div><footer><span>● &nbsp; المستخدم المحلي</span><button id="lock" title="قفل سطح المكتب" aria-label="قفل سطح المكتب">⏻</button></footer></section>
   <section id="quick" class="glass hidden" aria-label="الإعدادات السريعة"><h3>الإعدادات السريعة</h3><div class="quick-grid"><button id="wifi" aria-pressed="true">◉<br>Wi-Fi</button><button id="quiet" aria-pressed="false">☾<br>عدم الإزعاج</button><button id="theme-quick">◐<br>المظهر</button></div><label>سطوع سطح المكتب<input id="brightness" aria-label="السطوع" type="range" min="45" max="100" value="100"></label><p class="muted">عناصر تجريبية داخل المحاكاة</p></section>
@@ -67,13 +69,16 @@ function openApp(id){
   const bar=w.querySelector('.titlebar');bar.ondblclick=e=>{if(!e.target.closest('button'))maximize();};
   bar.onpointerdown=e=>{if(e.target.closest('button')||w.classList.contains('maximized'))return;const rect=w.getBoundingClientRect();const dx=e.clientX-rect.left,dy=e.clientY-rect.top;bar.setPointerCapture(e.pointerId);bar.onpointermove=m=>{w.style.left=`${Math.max(0,Math.min(innerWidth-100,m.clientX-dx))}px`;w.style.top=`${Math.max(0,Math.min(innerHeight-100,m.clientY-dy))}px`;};bar.onpointerup=()=>bar.onpointermove=null;bar.onpointercancel=()=>bar.onpointermove=null;};
   const content=w.querySelector('.window-content');
-  if(id==='notes'){content.innerHTML='<div class="notes-toolbar"><span>ملاحظة شخصية</span><span id="save-state">تُحفظ تلقائيًا على هذا المتصفح</span></div><textarea aria-label="نص الملاحظة" placeholder="كل فكرة رائعة تبدأ بكلمة…"></textarea>';const area=content.querySelector('textarea');area.value=read('myos-note','');area.oninput=()=>save('myos-note',area.value);area.focus();}
+  if(id==='notes') w.cleanup=setupNotes(content);
   if(id==='browser') w.cleanup=setupBrowser(content);
-  if(id==='strategy') w.cleanup=setupGame(content);
+  if(id==='strategy'){
+    content.textContent='جارٍ تحميل العالم ثلاثي الأبعاد…';
+    import('./game.js').then(({setupGame})=>{if(w.isConnected)w.cleanup=setupGame(content);}).catch(()=>{if(w.isConnected)content.textContent='تعذّر تحميل اللعبة. أعد تحميل الصفحة وحاول مجددًا.';});
+  }
   if(id==='calculator') setupCalculator(content);
   if(id==='files') setupFiles(content);
   if(id==='settings'){content.innerHTML=`<div class="settings-page"><span class="eyebrow">MAKE IT YOURS</span><h2>مساحة تشبهك</h2><p class="muted">خصّص مظهر سطح المكتب.</p><h3>المظهر</h3><div class="theme-options"><button data-theme="dark">🌙 &nbsp; ليلي</button><button data-theme="light">☀ &nbsp; نهاري</button></div><h3>الخلفية</h3><div class="wallpapers"><button data-wall="blue" aria-label="خلفية زرقاء"></button><button data-wall="purple" aria-label="خلفية بنفسجية"></button><button data-wall="green" aria-label="خلفية خضراء"></button></div><p class="muted">تُحفظ تفضيلاتك محليًا، ولا تحتاج إلى حساب.</p></div>`;content.querySelectorAll('[data-theme]').forEach(b=>b.onclick=()=>setTheme(b.dataset.theme));content.querySelectorAll('[data-wall]').forEach(b=>b.onclick=()=>setWallpaper(b.dataset.wall));}
-  if(id==='about')content.innerHTML='<div class="about-page"><span class="about-mark">◈</span><h2>MyOS</h2><p>سطح مكتب صغير. احتمالات كبيرة.</p><p class="muted">محاكاة تفاعلية مستوحاة من ويندوز 11 تعمل داخل المتصفح.<br>ليست نظام تشغيل حقيقيًا، ولا تشغّل برامج Windows.</p><span class="version">الإصدار 1.0 · صُنع للفضول والإبداع</span></div>';
+  if(id==='about')content.innerHTML='<div class="about-page"><span class="about-mark">◈</span><h2>MyOS</h2><p>سطح مكتب صغير. احتمالات كبيرة.</p><p class="muted">محاكاة تفاعلية مستوحاة من ويندوز 11 تعمل داخل المتصفح.<br>ليست نظام تشغيل حقيقيًا، ولا تشغّل برامج Windows.</p><span class="version">الإصدار 2.0 · Develped by:Pro. Magdy S. Aqel</span></div>';
 }
 function setWallpaper(value){document.documentElement.dataset.wallpaper=value;save('myos-wallpaper',value);}
 setWallpaper(read('myos-wallpaper','blue'));
@@ -90,3 +95,5 @@ function setupCalculator(content){
   const calculate=()=>{if(stored===null||!operator)return;const value=Number(display);const result=operator==='+'?stored+value:operator==='−'?stored-value:operator==='×'?stored*value:value===0?NaN:stored/value;display=Number.isFinite(result)?String(Number(result.toPrecision(12))):'خطأ';stored=null;operator=null;};
   for(const key of ['C','±','%','÷','7','8','9','×','4','5','6','−','1','2','3','+','⌫','0','.','=']){const b=document.createElement('button');b.textContent=key;if(key==='=')b.className='equals';b.onclick=()=>{if(/^[0-9.]$/.test(key)){if(fresh||display==='خطأ'){display=key==='.'?'0.':key;fresh=false;}else if(key!=='.'||!display.includes('.'))display=display==='0'&&key!=='.'?key:display+key;}else if(key==='C'){display='0';stored=null;operator=null;fresh=true;}else if(key==='⌫'){display=display.slice(0,-1)||'0';}else if(key==='±'){display=String(-Number(display));}else if(key==='%'){display=String(Number(display)/100);}else if(key==='='){calculate();fresh=true;}else{if(!fresh)calculate();stored=Number(display);operator=key;fresh=true;}output.textContent=display;};content.querySelector('.calc-keys').append(b);}
 }
+
+bootDesktop();

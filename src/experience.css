@@ -1,0 +1,253 @@
+#boot-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  background: #05080e;
+  color: #f0f7ff;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  font-family: Tahoma, Arial, sans-serif;
+  transition: background 1s;
+}
+.boot-center {
+  margin-top: -80px;
+}
+.boot-logo {
+  display: grid;
+  grid-template-columns: repeat(2, 46px);
+  gap: 5px;
+  direction: ltr;
+  transform: perspective(300px) rotateY(-9deg);
+  margin: 0 auto 30px;
+  width: max-content;
+  filter: drop-shadow(0 0 22px #158cff55);
+}
+.boot-logo i {
+  width: 46px;
+  height: 46px;
+  background: #20a8fc;
+}
+.boot-center h1 {
+  font-size: 25px;
+  font-weight: 400;
+  letter-spacing: 2px;
+  direction: ltr;
+}
+.boot-center h1 span {
+  font-weight: 300;
+  color: #7bcaff;
+}
+.boot-spinner {
+  width: 25px;
+  height: 25px;
+  border: 2px dotted #bce7ff;
+  border-left-color: transparent;
+  border-radius: 50%;
+  animation: boot-spin 1.4s linear infinite;
+  margin: 38px auto 20px;
+}
+.boot-status {
+  font-size: 13px;
+  color: #bbccdd;
+  min-height: 20px;
+}
+#boot-screen footer {
+  position: absolute;
+  bottom: 6%;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  align-items: center;
+}
+#boot-screen footer p {
+  font-size: 14px;
+  letter-spacing: 0.5px;
+  margin: 0;
+}
+#boot-screen footer button {
+  border: 1px solid #ffffff35;
+  padding: 9px 24px;
+  background: #ffffff0a;
+  color: #b6c8d9;
+  font-size: 12px;
+}
+#boot-screen footer small {
+  font-size: 10px;
+  color: #6b7f95;
+}
+#boot-screen.boot-welcome {
+  background: radial-gradient(ellipse at 65% 35%, #164b7e, #0a1731 80%);
+}
+.developer-credit {
+  position: absolute;
+  left: 25px;
+  bottom: 18px;
+  color: #9db9d5;
+  font: 11px Arial;
+  letter-spacing: 0.4px;
+  pointer-events: none;
+}
+.notebook {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+}
+.notes-sidebar {
+  width: 180px;
+  flex-shrink: 0;
+  background: #0001;
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+}
+.notes-sidebar > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 12px;
+  font-size: 12px;
+}
+.notes-sidebar > div button {
+  font-size: 22px;
+}
+.notes-sidebar nav {
+  flex: 1;
+  overflow: auto;
+  padding: 0 7px;
+}
+.notes-sidebar nav button {
+  display: block;
+  text-align: right;
+  width: 100%;
+  padding: 12px;
+  font-size: 12px;
+  margin-bottom: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.notes-sidebar [aria-current="true"] {
+  background: var(--surface);
+  box-shadow: inset -3px 0 var(--accent);
+}
+.notes-sidebar p {
+  font-size: 9px;
+  line-height: 1.9;
+  color: var(--muted);
+  padding: 12px;
+}
+.notes-editor {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.notes-editor header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.notes-editor header input {
+  width: 100%;
+  min-width: 0;
+  flex: 1;
+  font-size: 14px;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  padding: 8px;
+}
+.notes-editor header button {
+  font-size: 11px;
+  white-space: nowrap;
+  padding: 7px;
+  background: var(--surface);
+}
+.notes-editor textarea {
+  height: auto;
+  flex: 1;
+  min-height: 100px;
+  padding: 18px 22px;
+}
+.notes-editor footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 15px;
+  border-top: 1px solid var(--border);
+  font-size: 10px;
+  color: var(--muted);
+}
+[data-saved="false"] {
+  color: #ed9e83;
+}
+@keyframes boot-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (max-width: 650px) {
+  .developer-credit {
+    font-size: 9px;
+    left: 12px;
+    bottom: 10px;
+  }
+  .notes-sidebar {
+    width: 105px;
+  }
+  .notes-sidebar > div {
+    padding: 10px 6px;
+    font-size: 10px;
+  }
+  .notes-sidebar nav {
+    padding: 0 4px;
+  }
+  .notes-sidebar nav button {
+    font-size: 10px;
+    padding: 10px 6px;
+  }
+  .notes-sidebar p {
+    font-size: 8px;
+    padding: 8px;
+  }
+  .notes-editor header {
+    padding: 6px;
+    gap: 3px;
+  }
+  .notes-editor header input {
+    font-size: 12px;
+    padding: 6px;
+  }
+  .notes-editor header button {
+    font-size: 9px;
+  }
+  .notes-editor textarea {
+    padding: 12px;
+    font-size: 14px;
+  }
+  .notes-editor footer {
+    font-size: 9px;
+    flex-wrap: wrap;
+    padding: 8px;
+  }
+  .boot-logo i {
+    width: 38px;
+    height: 38px;
+  }
+  .boot-logo {
+    grid-template-columns: repeat(2, 38px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .boot-spinner {
+    animation: none;
+  }
+  #boot-screen {
+    transition: none;
+  }
+}
