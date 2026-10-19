@@ -169,3 +169,22 @@ test("editing remains usable after the viewport shrinks", async ({ page }) => {
   await area.fill("نص بعد تغيير المساحة");
   await expect(page.locator(".notes-save-state")).toContainText("تم الحفظ");
 });
+
+test('phone keeps storage and sound failures visible', async ({page}) => {
+  await page.addInitScript(() => {
+    const set = Storage.prototype.setItem;
+    Storage.prototype.setItem = function(key, value) {
+      if (key === 'myos-campaign-v1') throw new DOMException('Full', 'QuotaExceededError');
+      return set.call(this, key, value);
+    };
+    window.AudioContext = undefined;
+    window.webkitAudioContext = undefined;
+  });
+  await desktop(page);
+  await page.locator('.desktop-icons [data-open="strategy"]').tap();
+  await expect(page.locator('.campaign-save')).toBeVisible();
+  await expect(page.locator('.campaign-save')).toContainText('تعذّر حفظ');
+  await page.getByRole('button', {name: 'تشغيل الأصوات', exact: true}).tap();
+  await expect(page.locator('.sound-status')).toBeVisible();
+  await expect(page.locator('.sound-status')).toContainText('غير مدعوم');
+});

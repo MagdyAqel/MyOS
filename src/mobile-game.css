@@ -440,3 +440,4 @@
     padding: 12px;
   }
 }
+@media (max-width:650px),(max-width:950px) and (max-height:500px),(pointer:coarse) and (max-width:1024px){.rts-app .sound-status[data-error=true],.rts-app .campaign-save[data-error=true]{display:block;flex-shrink:0;max-height:44px;overflow:auto;padding:6px 10px;font-size:10px;line-height:1.5;color:#f6bba0}}

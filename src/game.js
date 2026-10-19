@@ -91,6 +91,7 @@ export function setupGame(content) {
     if (element.textContent !== value) element.textContent = value;
   };
   function saveProgress() {
+    content.querySelector(".campaign-save").removeAttribute("data-error");
     try {
       storage.setItem("myos-campaign-v1", JSON.stringify(progress));
       text(
@@ -98,6 +99,7 @@ export function setupGame(content) {
         "المراحل المكتملة محفوظة على هذا المتصفح",
       );
     } catch {
+      content.querySelector(".campaign-save").dataset.error="true";
       text(
         content.querySelector(".campaign-save"),
         "تعذّر حفظ تقدم المراحل: التخزين المحلي غير متاح أو ممتلئ",
@@ -273,6 +275,7 @@ export function setupGame(content) {
   };
   content.querySelector('[data-sound="toggle"]').onclick = async () => {
     const status = content.querySelector(".sound-status");
+    status.removeAttribute("data-error");
     try {
       if (audio.enabled) {
         audio.mute();
@@ -285,12 +288,12 @@ export function setupGame(content) {
           "المؤثرات الصوتية مفعّلة: أسلحة وانفجارات ومحركات وأمواج وسونار";
       }
     } catch (error) {
+      status.dataset.error="true";
       status.textContent = error.message;
     }
     refresh();
   };
-  content.querySelector('[aria-label="مستوى صوت اللعبة"]').oninput = (event) =>
-    audio.setVolume(Number(event.target.value) / 100);
+  content.querySelector('[aria-label="مستوى صوت اللعبة"]').oninput = (event) => {audio.setVolume(Number(event.target.value) / 100);content.querySelector('[aria-label="مستوى الصوت للجوال"]').value=event.target.value;};
   minimap.onclick = (event) => {
     if (!view) return;
     const rect = minimap.querySelector("svg").getBoundingClientRect(),
