@@ -7,8 +7,12 @@ export const WALLPAPERS = [
   { id: "coast", name: "شاطئ هادئ", file: "coast.svg" },
   { id: "dunes", name: "كثبان الغروب", file: "dunes.svg" },
 ];
-// Public URLs are relative to Vite's configured deployment base.
-const source = (wall) => `${import.meta.env.BASE_URL}wallpapers/${wall.file}`;
+// Use absolute URLs: CSS custom-property URLs otherwise resolve against assets/*.css.
+const source = (wall) =>
+  new URL(
+    `${import.meta.env.BASE_URL}wallpapers/${wall.file}`,
+    document.baseURI,
+  ).href;
 function imageStore(mode, action) {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open("myos-personalization", 1);

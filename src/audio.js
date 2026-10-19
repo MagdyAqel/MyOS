@@ -215,8 +215,16 @@ export class BattleAudio {
     this.active = active;
     if (this.context) {
       this.master.gain.cancelScheduledValues(this.context.currentTime);
-      if (active) this.master.gain.setTargetAtTime(this.volume,this.context.currentTime,0.04);
-      else { this.master.gain.value=0;this.master.gain.setValueAtTime(0,this.context.currentTime); }
+      if (active)
+        this.master.gain.setTargetAtTime(
+          this.volume,
+          this.context.currentTime,
+          0.04,
+        );
+      else {
+        this.master.gain.value = 0;
+        this.master.gain.setValueAtTime(0, this.context.currentTime);
+      }
     }
     if (!active) {
       this.stopAmbient();
