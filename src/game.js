@@ -8,6 +8,9 @@ import "./apps.css";
 import "./campaign.css";
 import "./mobile-game.css";
 import { COMPACT_QUERY } from "./mobile.js";
+import {DIFFICULTIES,MISSIONS,missionStatus} from "./systems.js";
+import {saveBattle,readBattle,restoreBattle,BATTLE_AUTO} from "./battle-save.js";
+import "./features.css";
 
 export function setupGame(content) {
   let storage;
@@ -33,12 +36,12 @@ export function setupGame(content) {
   }
   content.innerHTML = `<div class="rts-app">
     <header class="rts-header"><div><span class="eyebrow">COMMAND HORIZON · 3D</span><strong>قيادة الأفق</strong></div><div class="rts-stats" aria-live="off"><span data-stat="cash"></span><span data-stat="wave"></span><span data-stat="army"></span></div><div class="sound-controls"><button data-sound="toggle" aria-pressed="false">تشغيل الأصوات</button><label>الصوت <input type="range" min="0" max="100" aria-label="مستوى صوت اللعبة" value="${Math.round(audio.volume * 100)}"></label></div><button data-game="pause">إيقاف مؤقت</button><button data-game="restart">إعادة المرحلة</button></header>
-    <div class="campaign-bar" id="game-maps"><label>المراحل <select aria-label="اختيار المرحلة">${STAGES.map((s, i) => `<option value="${i}">${i + 1}. ${s.name} — ${s.category}</option>`).join("")}</select></label><label>الخريطة <select aria-label="اختيار الخريطة"></select></label><label class="mobile-game-only mobile-volume">مستوى الصوت <input type="range" min="0" max="100" value="${Math.round(audio.volume * 100)}" aria-label="مستوى الصوت للجوال"></label><span class="campaign-progress"></span><button data-game="next">المرحلة التالية ←</button><small>تغيير المرحلة أو الخريطة يبدأ مهمة جديدة</small></div>
+    <div class="campaign-bar" id="game-maps"><label>المراحل <select aria-label="اختيار المرحلة">${STAGES.map((s, i) => `<option value="${i}">${i + 1}. ${s.name} — ${s.category}</option>`).join("")}</select></label><label>الخريطة <select aria-label="اختيار الخريطة"></select></label><label>المهمة <select aria-label="نوع المهمة"></select></label><label>الصعوبة <select aria-label="مستوى الصعوبة">${Object.entries(DIFFICULTIES).map(([id,d])=>`<option value="${id}" ${id==='normal'?'selected':''}>${d.name}</option>`).join('')}</select></label><div class="save-controls"><button data-game="save">حفظ المعركة</button><button data-game="resume">استئناف آخر حفظ</button><button data-game="fog" aria-pressed="true">ضباب الحرب</button><span class="battle-save-status" role="status"></span></div><label class="mobile-game-only mobile-volume">مستوى الصوت <input type="range" min="0" max="100" value="${Math.round(audio.volume * 100)}" aria-label="مستوى الصوت للجوال"></label><span class="campaign-progress"></span><button data-game="next">المرحلة التالية ←</button><small>تغيير المرحلة أو الخريطة أو المهمة أو الصعوبة يبدأ معركة جديدة</small></div>
     <div class="rts-layout"><div class="battlefield"><canvas tabindex="0" aria-label="ساحة المعركة ثلاثية الأبعاد"></canvas><div class="scene-badge">3D · WEBGL</div><span class="mobile-game-only touch-hint">اسحب للتحريك · إصبعان للتقريب والتدوير</span><button class="mobile-game-only mobile-placement" data-game="place-touch">تأكيد البناء المقترح</button><button class="battle-minimap" aria-label="الخريطة المصغرة: انقر لتحريك الكاميرا" title="انقر لتحريك الكاميرا، Shift لإصدار أمر للجيش المحدد"></button><div class="camera-tools" aria-label="التحكم بالكاميرا"><button data-camera="in" aria-label="تقريب الكاميرا">＋</button><button data-camera="out" aria-label="إبعاد الكاميرا">−</button><button data-camera="left" aria-label="تدوير الكاميرا لليسار">↶</button><button data-camera="right" aria-label="تدوير الكاميرا لليمين">↷</button><button data-camera="focus" aria-label="التركيز على الجيش">◎</button><button data-camera="home" aria-label="إعادة ضبط الكاميرا">⌂</button></div><div class="rts-result hidden" role="status"></div></div>
-    <aside class="rts-panel" id="game-commands"><button class="mobile-game-only" data-game="multiselect" aria-pressed="false">تحديد متعدد باللمس</button><div class="map-preview"></div><div class="rts-mission"><span></span><h2></h2><p></p></div><h3>إنشاء مبانٍ</h3><div class="build-buttons"></div><button data-game="autoplace">بناء في مكان مقترح</button><h3>تدريب الوحدات</h3><div class="train-buttons"></div><p class="rts-help">اختر مبنى ثم انقر الأرض، أو استخدم المكان المقترح. حدد الوحدات ثم انقر للتحرك أو الهجوم. عجلة الفأرة للتقريب، والزر الأوسط لتدوير الكاميرا، وإصبعان على الهاتف.</p></aside></div>
+    <aside class="rts-panel" id="game-commands"><button class="mobile-game-only" data-game="multiselect" aria-pressed="false">تحديد متعدد باللمس</button><div class="map-preview"></div><div class="rts-mission"><span></span><h2></h2><p></p></div><h3>إنشاء مبانٍ</h3><div class="build-buttons"></div><button data-game="autoplace">بناء في مكان مقترح</button><div class="mission-objective"></div><p class="selected-logistics"></p><button data-game="service">عودة للصيانة والتسليح</button><h3>تدريب الوحدات</h3><div class="train-buttons"></div><p class="rts-help">اختر مبنى ثم انقر الأرض، أو استخدم المكان المقترح. حدد الوحدات ثم انقر للتحرك أو الهجوم. عجلة الفأرة للتقريب، والزر الأوسط لتدوير الكاميرا، وإصبعان على الهاتف.</p></aside></div>
     <nav class="battle-actions" aria-label="أوامر المعركة"><button class="mobile-game-only" data-game="commands" aria-expanded="false" aria-controls="game-commands">بناء وتدريب</button><button data-game="select">تحديد الجيش</button><button data-game="attack">هجوم على مقر العدو</button><button class="mobile-game-only" data-game="maps" aria-expanded="false" aria-controls="game-maps">الخرائط والصوت</button></nav>
     <footer class="rts-footer"><span class="rts-message" role="status"></span><span>أزرق: أنت · أحمر: العدو</span></footer><p class="campaign-save" role="status"></p><p class="sound-status" role="status">الصوت متوقف حتى تضغط «تشغيل الأصوات».</p>
-    <details class="rts-instructions"><summary>طريقة اللعب وحفظ التقدم</summary><p>كل مرحلة لها وحداتها وساحة مختلفة. مراكز الإمداد تمنح $180 كل ٥ ثوانٍ. الثكنة والمصنع والمطار والميناء تتطلب طاقة. الغواصات تستخدم الطوربيدات ضد السفن والغواصات؛ المقاتلات لا تهاجم الغواصات. انقر وحدة لتحديدها وShift لإضافة وحدات. دمّر مقر العدو للفوز وفتح زر المرحلة التالية. جميع المراحل متاحة للتجربة من القائمة. تُحفظ المراحل المكتملة محليًا؛ المعركة الجارية تبدأ من جديد عند إغلاق النافذة. اللعبة أصلية ولا تستخدم ملفات Generals.</p></details></div>`;
+    <details class="rts-instructions"><summary>طريقة اللعب وحفظ التقدم</summary><p>كل مرحلة لها وحداتها وساحة مختلفة. مراكز الإمداد تمنح $180 كل ٥ ثوانٍ. الثكنة والمصنع والمطار والميناء تتطلب طاقة. الغواصات تستخدم الطوربيدات ضد السفن والغواصات؛ المقاتلات لا تهاجم الغواصات. انقر وحدة لتحديدها وShift لإضافة وحدات. أكمل الهدف الموضح للمهمة للفوز وفتح زر المرحلة التالية. جميع المراحل متاحة للتجربة من القائمة. تُحفظ المعركة تلقائيًا، ويمكنك حفظها يدويًا واستعادتها بزر «استئناف آخر حفظ». تعود المحفوظة متوقفة حتى تضغط متابعة. ضباب الحرب يخفي العدو حتى تستكشفه؛ الوحدات تحتاج ذخيرة ويمكن إعادتها للصيانة والتسليح قرب القاعدة. اللعبة أصلية ولا تستخدم ملفات Generals.</p></details></div>`;
   const canvas = content.querySelector("canvas"),
     message = content.querySelector(".rts-message"),
     result = content.querySelector(".rts-result"),
@@ -78,6 +81,10 @@ export function setupGame(content) {
   };
   content.querySelector('[data-game="place-touch"]').onclick = () =>
     content.querySelector('[data-game="autoplace"]').click();
+  let availableSave=readBattle(storage);
+  let lastAuto=0;
+  const missionSelect=content.querySelector('[aria-label="نوع المهمة"]'),difficultySelect=content.querySelector('[aria-label="مستوى الصعوبة"]');
+  function persist(automatic=false){if(!battle)return;try{saveBattle(storage,battle,automatic?BATTLE_AUTO:undefined);availableSave=readBattle(storage);text(content.querySelector(".battle-save-status"),automatic?"حُفظت المعركة تلقائيًا":"تم حفظ المعركة ✓");}catch{text(content.querySelector(".battle-save-status"),"تعذّر حفظ المعركة. التخزين ممتلئ أو غير متاح.");}}
   let battle,
     view,
     building = null,
@@ -107,6 +114,11 @@ export function setupGame(content) {
     }
   }
   function refresh() {
+    content.querySelector('[data-game="resume"]').disabled=!availableSave||availableSave.status!=="playing";
+    content.querySelector('[data-game="fog"]').setAttribute('aria-pressed',String(battle.fog));
+    text(content.querySelector('.mission-objective'),missionStatus(battle));
+    const squad=battle.entities.filter(e=>battle.selected.has(e.id)&&e.maxAmmo);
+    text(content.querySelector('.selected-logistics'),squad.length?`ذخيرة المحدد: ${squad.reduce((n,e)=>n+e.ammo,0)}/${squad.reduce((n,e)=>n+e.maxAmmo,0)} · الصيانة قرب القاعدة`:'اختر وحدات لعرض الذخيرة والصيانة');
     const soundButton = content.querySelector('[data-sound="toggle"]');
     text(soundButton, audio.enabled ? "كتم الأصوات" : "تشغيل الأصوات");
     soundButton.setAttribute(
@@ -126,7 +138,7 @@ export function setupGame(content) {
     soundButton.dataset.audioState = audio.context?.state || "not-started";
     minimap.innerHTML = mapSvg(
       battle.map,
-      battle.entities,
+      battle.entities.filter(e=>battle.isVisible(e)),
       battle.selected,
       view?.cameraTarget(),
     );
@@ -163,7 +175,7 @@ export function setupGame(content) {
         : ended
           ? battle.status === "won"
             ? "انتصار — اكتملت المرحلة"
-            : "انتهت المهمة — سقطت القاعدة"
+            : "انتهت المهمة — لم تتحقق الأهداف"
           : "المهمة متوقفة مؤقتًا",
     );
     for (const button of content.querySelectorAll(
@@ -195,12 +207,14 @@ export function setupGame(content) {
       saveProgress();
     }
   }
-  function start(index, mapId = chosenMaps[index]) {
+  function start(index, mapId = chosenMaps[index],restored=null) {
     audio.setActive(false);
     audio.sonar = 0;
     view?.dispose();
     view = null;
-    battle = new Battle(index, mapId);
+    battle = restored||new Battle(index,mapId,{mission:missionSelect.value,difficulty:difficultySelect.value});
+    lastAuto=battle.time;
+    missionSelect.innerHTML=MISSIONS.filter(m=>m.stages.includes(index)).map(m=>`<option value="${m.id}">${m.name}</option>`).join("");missionSelect.value=battle.mission.id;difficultySelect.value=battle.difficulty;
     chosenMaps[index] = battle.map.id;
     try {
       storage.setItem("myos-map-choice-v1", JSON.stringify(chosenMaps));
@@ -225,7 +239,7 @@ export function setupGame(content) {
       battle.stage.category;
     content.querySelector(".rts-mission h2").textContent = battle.stage.name;
     content.querySelector(".rts-mission p").textContent =
-      battle.stage.description;
+      battle.mission.description;
     content.querySelector(".build-buttons").innerHTML = battle.stage.buildings
       .map(
         (t) =>
@@ -268,6 +282,13 @@ export function setupGame(content) {
     }
     refresh();
   }
+  missionSelect.onchange=()=>start(battle.stageIndex,battle.map.id);
+  difficultySelect.onchange=()=>start(battle.stageIndex,battle.map.id);
+  content.querySelector('[data-game="save"]').onclick=()=>persist(false);
+  content.querySelector('[data-game="resume"]').onclick=()=>{try{const snapshot=readBattle(storage);if(!snapshot)throw Error();const restored=restoreBattle(snapshot);start(restored.stageIndex,restored.map.id,restored);text(content.querySelector('.battle-save-status'),'استُعيدت المعركة. اضغط متابعة للعب.');}catch{text(content.querySelector('.battle-save-status'),'تعذّر قراءة الحفظ؛ ابدأ مهمة جديدة.');}};
+  content.querySelector('[data-game="fog"]').onclick=()=>{battle.fog=!battle.fog;refresh();};
+  content.querySelector('[data-game="service"]').onclick=()=>{battle.serviceSelected();refresh();};
+  const saveOnLeave=()=>persist(true);window.addEventListener('pagehide',saveOnLeave);
   mapSelect.onchange = () => {
     start(battle.stageIndex, mapSelect.value);
     shell.classList.remove("maps-open");
@@ -309,7 +330,7 @@ export function setupGame(content) {
       content.closest(".window").classList.contains("hidden") ||
       !document.querySelector("#lock-screen").classList.contains("hidden")
     )
-      audio.setActive(false);
+      {audio.setActive(false);persist(true);}
   };
   document.addEventListener("visibilitychange", silence);
   const visibilityObserver = new MutationObserver(silence);
@@ -500,6 +521,7 @@ export function setupGame(content) {
     audio.update(battle, events, visible && !graphicsFailed);
     view?.effects(events);
     if (visible) view?.draw(battle);
+    if(battle.status==="playing"&&battle.time-lastAuto>=10){lastAuto=battle.time;persist(true);}
     if (time - lastHud > 150) {
       refresh();
       lastHud = time;
@@ -507,8 +529,10 @@ export function setupGame(content) {
     animation = requestAnimationFrame(frame);
   }
   start(progress.stage);
+  if(availableSave)text(content.querySelector(".battle-save-status"),"توجد معركة محفوظة؛ اضغط استئناف آخر حفظ لمتابعتها.");
   animation = requestAnimationFrame(frame);
   return () => {
+    persist(true);window.removeEventListener("pagehide",saveOnLeave);
     stopped = true;
     audio.dispose().catch(() => {});
     document.removeEventListener("visibilitychange", silence);

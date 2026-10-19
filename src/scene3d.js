@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { mapFor } from "./maps.js";
 import { enhanceEnvironment } from "./environment3d.js";
+import {createFog} from "./fog3d.js";
 
 // All models are built locally from geometry; no downloaded textures or game assets.
 export function createBattleScene(canvas, stage, map = mapFor(0)) {
@@ -211,6 +212,7 @@ export function createBattleScene(canvas, stage, map = mapFor(0)) {
   scene.add(grid);
   grid.visible = false;
   if (water) water.visible = false;
+  const fogOfWar=createFog(scene,stage);
   const environment = enhanceEnvironment(scene, terrain, stage, map);
   function label(text, color) {
     const c = document.createElement("canvas");
@@ -235,7 +237,7 @@ export function createBattleScene(canvas, stage, map = mapFor(0)) {
   }
   function createModel(e) {
     const g = new THREE.Group(),
-      color = e.team === "blue" ? "#3b91ba" : "#bf554a",
+      color = e.team === "blue" ? "#3b91ba" :e.team==="neutral"?"#d4b26a": "#bf554a",
       light = e.team === "blue" ? "#93deed" : "#ffc89f",
       dark = "#263640";
     g.userData.entityId = e.id;
@@ -285,6 +287,7 @@ export function createBattleScene(canvas, stage, map = mapFor(0)) {
         cylinder(g, 7, 5, dark, 0, 8, 22);
         box(g, 3, 3, 22, light, 0, 12, 31);
       }
+    } else if(e.type==="convoy"){box(g,26,16,48,color,0,14,0);box(g,24,18,17,"#7ca4b1",0,15,29);for(const x of [-17,17])for(const z of [-16,16])cylinder(g,6,5,"#25333a",x,6,z).rotation.z=Math.PI/2;
     } else if (e.type === "tank") {
       box(g, 30, 10, 38, color, 0, 8, 0);
       box(g, 8, 12, 42, dark, -19, 6, 0);
@@ -295,7 +298,7 @@ export function createBattleScene(canvas, stage, map = mapFor(0)) {
       }
       box(g, 20, 9, 21, color, 0, 17, -2);
       box(g, 4, 4, 32, light, 0, 19, 20);
-    } else if (e.type === "soldier") {
+    } else if (e.type === "soldier"||e.type==="survivor") {
       cylinder(g, 5, 12, color, 0, 12, 0);
       mesh(new THREE.SphereGeometry(4, 8, 8), "#d0b18a", g, 0, 22, 0);
       cylinder(g, 4.5, 4, dark, 0, 25, 0);
@@ -435,6 +438,7 @@ export function createBattleScene(canvas, stage, map = mapFor(0)) {
       }
     for (const e of battle.entities) {
       const g = models.get(e.id) || createModel(e);
+      g.visible=battle.isVisible?battle.isVisible(e):true;
       g.position.set(e.x - 500, altitude(e.domain, battle.time), e.y - 310);
       if (e.speed)
         g.rotation.y =
@@ -459,7 +463,7 @@ export function createBattleScene(canvas, stage, map = mapFor(0)) {
     effectGeo.setDrawRange(0, Math.min(vertices.length, 3072) / 3);
     if (water)
       water.material.opacity = 0.2 + Math.sin(battle.time * 1.5) * 0.06;
-    environment.animate(battle);
+    environment.animate(battle);fogOfWar.draw(battle);
     for (const entity of battle.entities) {
       const model = models.get(entity.id);
       if (entity.firing > 0 && model) {
@@ -480,7 +484,7 @@ export function createBattleScene(canvas, stage, map = mapFor(0)) {
     );
     raycaster.setFromCamera(mouse, camera);
     const hits = raycaster
-      .intersectObjects([...models.values()], true)
+      .intersectObjects([...models.values()].filter(m=>m.visible), true)
       .filter((h) => h.object.type === "Mesh");
     if (hits.length) {
       let model = hits[0].object;
@@ -519,7 +523,7 @@ export function createBattleScene(canvas, stage, map = mapFor(0)) {
     });
   }
   function dispose(releaseContext = false) {
-    environment.dispose();
+    environment.dispose();fogOfWar.dispose();
     controls.dispose();
     scene.traverse((o) => {
       if (!o.isSprite) o.geometry?.dispose();

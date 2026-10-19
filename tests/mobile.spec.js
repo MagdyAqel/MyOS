@@ -188,3 +188,9 @@ test('phone keeps storage and sound failures visible', async ({page}) => {
   await expect(page.locator('.sound-status')).toBeVisible();
   await expect(page.locator('.sound-status')).toContainText('غير مدعوم');
 });
+
+test('phone can edit real files in a reduced viewport and reach mission save controls',async({page})=>{
+ await desktop(page);await page.locator('.desktop-icons [data-open="files"]').tap();await page.getByRole('button',{name:'ملف جديد',exact:true}).tap();await page.getByRole('textbox',{name:'اسم العنصر الجديد'}).fill('هاتف.txt');await page.locator('.file-create').getByRole('button',{name:'إنشاء',exact:true}).tap();
+ const editor=page.getByRole('textbox',{name:'محتوى الملف'});await editor.fill('نص من الجوال');await contained(editor,390,786);await page.setViewportSize({width:390,height:540});await editor.fill('تعديل مع مساحة أصغر');await contained(editor,390,482);await expect(page.locator('.file-status')).toContainText('تم الحفظ');await page.getByRole('button',{name:'إغلاق',exact:true}).tap();
+ await page.setViewportSize({width:390,height:844});await page.locator('.desktop-icons [data-open="strategy"]').tap();await expect(page.locator('canvas')).toHaveAttribute('data-renderer','webgl');await page.locator('[data-game="maps"]').tap();await page.getByRole('combobox',{name:'نوع المهمة'}).selectOption('escort');await page.getByRole('combobox',{name:'مستوى الصعوبة'}).selectOption('easy');await page.locator('[data-game="save"]').tap();await expect(page.locator('.battle-save-status')).toContainText('تم حفظ');await page.locator('[data-game="resume"]').tap();await expect(page.locator('.rts-result')).toContainText('متوقفة');
+});

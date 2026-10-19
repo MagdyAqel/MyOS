@@ -1,9 +1,11 @@
 import { STAGES } from "./campaign.js";
 import { mapFor, blocked } from "./maps.js";
 import { moveUnit, clearShot, walkable } from "./navigation.js";
+import {EXTRA_TYPES,initializeSystems,visibleTo,updateExploration,updateEnemy,updateLogistics,advanceMission,missionOutcome,serviceUnit,DIFFICULTIES} from "./systems.js";
 export const WIDTH = 1000,
   HEIGHT = 620;
 export const TYPES = {
+  ...EXTRA_TYPES,
   hq: { name: "مركز القيادة", hp: 1800, radius: 38, domain: "ground" },
   power: {
     name: "محطة طاقة",
@@ -144,7 +146,7 @@ export const TYPES = {
 };
 const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 export class Battle {
-  constructor(stage = 0, mapId) {
+  constructor(stage = 0, mapId, options={}) {
     this.stageIndex = Number.isInteger(stage) && STAGES[stage] ? stage : 0;
     this.stage = STAGES[this.stageIndex];
     this.map = mapFor(this.stageIndex, mapId);
@@ -187,7 +189,10 @@ export class Battle {
       this.add("submarine", "blue", 230, 420);
       this.add(abyss ? "submarine" : "destroyer", "blue", 180, 500);
     }
+    initializeSystems(this,options);
   }
+  isVisible(entity,team="blue"){return visibleTo(this,entity,team);}
+  serviceSelected(){for(const unit of this.entities.filter(e=>this.selected.has(e.id)&&e.damage&&e.speed))serviceUnit(this,unit);this.message="عودة الوحدات للصيانة وإعادة التسليح؛ الإصلاح يستهلك الموارد";}
   add(type, team, x, y) {
     const e = {
       ...TYPES[type],
@@ -199,7 +204,9 @@ export class Battle {
       maxHp: TYPES[type].hp,
       cd: 0,
       order: null,
+      maxAmmo:({soldier:90,tank:18,fighter:12,bomber:8,destroyer:24,submarine:12})[type]||0,
     };
+    e.ammo=e.maxAmmo;
     if (type === "hq" && this.stageIndex === 3) {
       e.domain = "sub";
       e.name = "محطة قيادة الأعماق";
@@ -373,7 +380,7 @@ export class Battle {
     let i = 0,
       unsupported = 0;
     for (const unit of this.entities.filter((e) => this.selected.has(e.id))) {
-      if (enemy && !unit.targets.includes(enemy.domain)) {
+      if (enemy && !(unit.targets||[]).includes(enemy.domain)) {
         unsupported++;
         continue;
       }
@@ -401,6 +408,7 @@ export class Battle {
     )
       return;
     this.time += dt;
+    updateEnemy(this,TYPES);updateLogistics(this,dt);advanceMission(this,dt);updateExploration(this);
     this.income += dt;
     while (this.income >= 5) {
       this.income -= 5;
@@ -409,6 +417,7 @@ export class Battle {
           (e) => e.type === "supply" && e.team === "blue" && e.hp > 0,
         ).length * 180;
     }
+    if(this.incomeEnemy===undefined)this.incomeEnemy=0;this.incomeEnemy+=dt;while(this.incomeEnemy>=5){this.incomeEnemy-=5;this.enemy.cash+=(40+140*this.entities.filter(e=>e.team==="red"&&e.type==="supply").length)*DIFFICULTIES[this.difficulty].income;}
     if (this.time >= this.nextWave && this.wave < this.stage.waves) {
       this.wave++;
       this.emit("wave", { wave: this.wave });
@@ -435,7 +444,7 @@ export class Battle {
       unit.cd = Math.max(0, unit.cd - dt);
       const opponents = this.entities.filter(
         (e) =>
-          e.team !== unit.team && e.hp > 0 && unit.targets.includes(e.domain),
+          e.team !== unit.team &&e.team!=="neutral"&& e.hp > 0 && unit.targets.includes(e.domain),
       );
       const ordered = unit.order?.target
         ? opponents.find((e) => e.id === unit.order.target)
@@ -454,9 +463,10 @@ export class Battle {
         clearShot(this.map, unit, ordered)
           ? ordered
           : nearby;
-      if (target) {
+      if (target&&(!unit.speed||unit.ammo>0)&&!unit.servicing) {
         if (unit.cd <= 0) {
           target.hp -= unit.damage;
+          if(unit.speed)unit.ammo--;
           unit.cd = unit.cooldown;
           unit.firing = 0.2;
           unit.aim = Math.atan2(target.x - unit.x, target.y - unit.y);
@@ -495,6 +505,7 @@ export class Battle {
     }
     for (const entity of this.entities) {
       entity.firing = Math.max(0, (entity.firing || 0) - dt);
+      if(entity.hp<=0&&entity.team==="red"&&["fighter","bomber"].includes(entity.type))this.objective.kills++;
       if (entity.hp <= 0)
         this.emit("explosion", {
           x: entity.x,
@@ -508,16 +519,7 @@ export class Battle {
       [...this.selected].filter((id) => this.entities.some((e) => e.id === id)),
     );
     this.effects = this.effects.filter((e) => (e.life -= dt) > 0);
-    if (!this.has("hq")) {
-      this.status = "lost";
-      this.emit("defeat");
-      this.message = "سقط مركز القيادة. أعد المحاولة بخطة دفاع أقوى.";
-    } else if (
-      !this.entities.some((e) => e.team === "red" && e.type === "hq")
-    ) {
-      this.status = "won";
-      this.emit("victory");
-      this.message = "انتصار! تم تدمير مركز قيادة العدو.";
-    }
+    const outcome=!this.has('hq')?'lost':missionOutcome(this);
+    if(outcome){this.status=outcome;this.emit(outcome==='won'?'victory':'defeat');this.message=outcome==='won'?'انتصار! اكتملت أهداف المهمة.':'انتهت المهمة. أعد المحاولة بخطة أقوى.';}
   }
 }

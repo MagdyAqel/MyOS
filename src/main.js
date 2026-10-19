@@ -1,9 +1,11 @@
 import './style.css';
 import { setupBrowser } from './browser.js';
 import { setupNotes } from './notes.js';
+import {setupFiles} from './files.js';
 import { bootDesktop, DEVELOPER } from './boot.js';
 import { createWallpaperManager, setupPersonalization } from './wallpapers.js';
 import { setupMobileViewport } from './mobile.js';
+import {setupPWA,setupInstall} from './pwa.js';
 
 const apps = [
   {id:'files', name:'مستكشف الملفات', icon:'📁', color:'#ffcb55'},
@@ -11,6 +13,8 @@ const apps = [
   {id:'calculator', name:'الحاسبة', icon:'▦', color:'#b9c8de'},
   {id:'browser', name:'المتصفح', icon:'🌐', color:'#68c9f3'},
   {id:'strategy', name:'قيادة الأفق 3D', icon:'🎖', color:'#f5cc83'},
+  {id:'install',name:'تثبيت MyOS',icon:'⇩',color:'#8cd5bd'},
+  {id:'cloud', name:'المزامنة السحابية', icon:'☁', color:'#9be0ff'},
   {id:'settings', name:'الإعدادات', icon:'⚙', color:'#adc7df'},
   {id:'about', name:'حول MyOS', icon:'◈', color:'#80cfff'},
 ];
@@ -18,6 +22,7 @@ const read = (key, fallback) => { try { return localStorage.getItem(key) ?? fall
 const save = (key, value) => { try { localStorage.setItem(key, value); } catch { toast('تعذّر الحفظ في هذا المتصفح'); } };
 let z = 10;
 const windows = new Map();
+window.addEventListener('myos:before-data-restore',()=>{for(const [id,w] of [...windows])if(id!=='cloud')w.querySelector('[data-action=close]').click();});
 const root = document.querySelector('#app');
 root.innerHTML = `
 <main id="desktop" aria-label="سطح المكتب">
@@ -77,18 +82,14 @@ function openApp(id){
     content.textContent='جارٍ تحميل العالم ثلاثي الأبعاد…';
     import('./game.js').then(({setupGame})=>{if(w.isConnected)w.cleanup=setupGame(content);}).catch(()=>{if(w.isConnected)content.textContent='تعذّر تحميل اللعبة. أعد تحميل الصفحة وحاول مجددًا.';});
   }
+  if(id==='cloud'){content.textContent='جارٍ فتح المزامنة…';import('./cloud.js').then(({setupCloud})=>{if(w.isConnected)w.cleanup=setupCloud(content);}).catch(()=>{if(w.isConnected)content.textContent='تعذّر فتح المزامنة. أعد المحاولة.';});}
+  if(id==='install')w.cleanup=setupInstall(content);
   if(id==='calculator') setupCalculator(content);
-  if(id==='files') setupFiles(content);
+  if(id==='files') w.cleanup=setupFiles(content);
   if(id==='settings')w.cleanup=setupPersonalization(content,wallpaperManager,setTheme);
-  if(id==='about')content.innerHTML='<div class="about-page"><span class="about-mark">◈</span><h2>MyOS</h2><p>سطح مكتب صغير. احتمالات كبيرة.</p><p class="muted">محاكاة تفاعلية مستوحاة من ويندوز 11 تعمل داخل المتصفح.<br>ليست نظام تشغيل حقيقيًا، ولا تشغّل برامج Windows.</p><span class="version">الإصدار 2.2 · Develped by:Pro. Magdy S. Aqel</span></div>';
+  if(id==='about')content.innerHTML='<div class="about-page"><span class="about-mark">◈</span><h2>MyOS</h2><p>سطح مكتب صغير. احتمالات كبيرة.</p><p class="muted">محاكاة تفاعلية مستوحاة من ويندوز 11 تعمل داخل المتصفح.<br>ليست نظام تشغيل حقيقيًا، ولا تشغّل برامج Windows.</p><span class="version">الإصدار 3.0 · Develped by:Pro. Magdy S. Aqel</span></div>';
 }
 const wallpaperManager=createWallpaperManager();
-function setupFiles(content){
-  const folders={'الرئيسية':[['📁','المستندات'],['📁','الصور'],['📁','التنزيلات'],['📄','مرحبًا.txt']], 'المستندات':[['📄','أفكاري.txt'],['📄','قائمة المهام.txt']], 'الصور':[['🌄','غروب الشمس'],['🏞','رحلة إلى الطبيعة']], 'التنزيلات':[]};
-  content.innerHTML=`<div class="file-layout"><aside>${Object.keys(folders).map((f,i)=>`<button data-folder="${f}">${i?'📁':'⌂'} &nbsp; ${f}</button>`).join('')}</aside><div class="file-main"><div class="file-path"></div><div class="file-items"></div><div class="file-status"></div></div></div>`;
-  const show=name=>{content.querySelector('.file-path').textContent='هذا الكمبيوتر  /  '+name;content.querySelectorAll('[data-folder]').forEach(b=>b.classList.toggle('selected',b.dataset.folder===name));const items=content.querySelector('.file-items');items.replaceChildren();for(const [icon,label]of folders[name]){const b=document.createElement('button');b.innerHTML=`<span>${icon}</span><span></span>`;b.lastChild.textContent=label;b.onclick=()=>folders[label]?show(label):label.endsWith('.txt')?openApp('notes'):toast('صورة تجريبية — لا يوجد ملف فعلي');items.append(b);}if(!folders[name].length)items.innerHTML='<p class="muted">هذا المجلد فارغ</p>';content.querySelector('.file-status').textContent=folders[name].length+' عناصر · ملفات توضيحية';};
-  content.querySelectorAll('[data-folder]').forEach(b=>b.onclick=()=>show(b.dataset.folder));show('الرئيسية');
-}
 function setupCalculator(content){
   content.innerHTML='<div class="calculator"><span class="muted">قياسية</span><output aria-label="نتيجة الحاسبة">0</output><div class="calc-keys"></div></div>';
   let display='0',stored=null,operator=null,fresh=true;
@@ -98,4 +99,5 @@ function setupCalculator(content){
 }
 
 setupMobileViewport();
+setupPWA();
 bootDesktop();

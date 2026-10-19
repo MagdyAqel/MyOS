@@ -1,11 +1,11 @@
 {
   "name": "myos-desktop",
-  "version": "2.2.0",
+  "version": "3.0.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "build": "vite build",
+    "build": "vite build && node scripts/build-offline.mjs",
     "preview": "vite preview --host 0.0.0.0",
     "test": "node --test tests/*.unit.js && playwright test",
     "test:production": "npm run build && playwright test --config playwright.production.config.js"

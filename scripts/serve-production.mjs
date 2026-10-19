@@ -7,6 +7,8 @@ const types = {
   ".js": "text/javascript",
   ".css": "text/css",
   ".svg": "image/svg+xml",
+  ".webmanifest": "application/manifest+json",
+  ".png": "image/png",
 };
 const server = createServer(async (req, res) => {
   try {

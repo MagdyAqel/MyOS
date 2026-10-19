@@ -28,7 +28,7 @@ test('calculator operations and division by zero',async({page})=>{
 });
 test('folders, appearance persistence, and lock screen',async({page})=>{
   await enterDesktop(page);await page.locator('[data-task="files"]').click();
-  await page.locator('.file-items').getByRole('button',{name:'التنزيلات'}).click();
+  await page.locator('.file-items').getByRole('button',{name:'التنزيلات',exact:true}).click();
   await expect(page.locator('.file-items')).toContainText('هذا المجلد فارغ');
   await page.getByRole('button',{name:'إغلاق',exact:true}).click();
   await page.locator('[data-task="settings"]').click();
