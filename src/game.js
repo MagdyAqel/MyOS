@@ -6,6 +6,8 @@ import { BattleAudio } from "./audio.js";
 import "./realism.css";
 import "./apps.css";
 import "./campaign.css";
+import "./mobile-game.css";
+import { COMPACT_QUERY } from "./mobile.js";
 
 export function setupGame(content) {
   let storage;
@@ -31,9 +33,10 @@ export function setupGame(content) {
   }
   content.innerHTML = `<div class="rts-app">
     <header class="rts-header"><div><span class="eyebrow">COMMAND HORIZON · 3D</span><strong>قيادة الأفق</strong></div><div class="rts-stats" aria-live="off"><span data-stat="cash"></span><span data-stat="wave"></span><span data-stat="army"></span></div><div class="sound-controls"><button data-sound="toggle" aria-pressed="false">تشغيل الأصوات</button><label>الصوت <input type="range" min="0" max="100" aria-label="مستوى صوت اللعبة" value="${Math.round(audio.volume * 100)}"></label></div><button data-game="pause">إيقاف مؤقت</button><button data-game="restart">إعادة المرحلة</button></header>
-    <div class="campaign-bar"><label>المراحل <select aria-label="اختيار المرحلة">${STAGES.map((s, i) => `<option value="${i}">${i + 1}. ${s.name} — ${s.category}</option>`).join("")}</select></label><label>الخريطة <select aria-label="اختيار الخريطة"></select></label><span class="campaign-progress"></span><button data-game="next">المرحلة التالية ←</button><small>تغيير المرحلة أو الخريطة يبدأ مهمة جديدة</small></div>
-    <div class="rts-layout"><div class="battlefield"><canvas tabindex="0" aria-label="ساحة المعركة ثلاثية الأبعاد"></canvas><div class="scene-badge">3D · WEBGL</div><button class="battle-minimap" aria-label="الخريطة المصغرة: انقر لتحريك الكاميرا" title="انقر لتحريك الكاميرا، Shift لإصدار أمر للجيش المحدد"></button><div class="camera-tools" aria-label="التحكم بالكاميرا"><button data-camera="in" aria-label="تقريب الكاميرا">＋</button><button data-camera="out" aria-label="إبعاد الكاميرا">−</button><button data-camera="left" aria-label="تدوير الكاميرا لليسار">↶</button><button data-camera="right" aria-label="تدوير الكاميرا لليمين">↷</button><button data-camera="focus" aria-label="التركيز على الجيش">◎</button><button data-camera="home" aria-label="إعادة ضبط الكاميرا">⌂</button></div><div class="rts-result hidden" role="status"></div></div>
-    <aside class="rts-panel"><div class="map-preview"></div><div class="rts-mission"><span></span><h2></h2><p></p></div><h3>إنشاء مبانٍ</h3><div class="build-buttons"></div><button data-game="autoplace">بناء في مكان مقترح</button><h3>تدريب الوحدات</h3><div class="train-buttons"></div><button data-game="select">تحديد الجيش</button><button data-game="attack">هجوم على مقر العدو</button><p class="rts-help">اختر مبنى ثم انقر الأرض، أو استخدم المكان المقترح. حدد الوحدات ثم انقر للتحرك أو الهجوم. عجلة الفأرة للتقريب، والزر الأوسط لتدوير الكاميرا، وإصبعان على الهاتف.</p></aside></div>
+    <div class="campaign-bar" id="game-maps"><label>المراحل <select aria-label="اختيار المرحلة">${STAGES.map((s, i) => `<option value="${i}">${i + 1}. ${s.name} — ${s.category}</option>`).join("")}</select></label><label>الخريطة <select aria-label="اختيار الخريطة"></select></label><label class="mobile-game-only mobile-volume">مستوى الصوت <input type="range" min="0" max="100" value="${Math.round(audio.volume * 100)}" aria-label="مستوى الصوت للجوال"></label><span class="campaign-progress"></span><button data-game="next">المرحلة التالية ←</button><small>تغيير المرحلة أو الخريطة يبدأ مهمة جديدة</small></div>
+    <div class="rts-layout"><div class="battlefield"><canvas tabindex="0" aria-label="ساحة المعركة ثلاثية الأبعاد"></canvas><div class="scene-badge">3D · WEBGL</div><span class="mobile-game-only touch-hint">اسحب للتحريك · إصبعان للتقريب والتدوير</span><button class="mobile-game-only mobile-placement" data-game="place-touch">تأكيد البناء المقترح</button><button class="battle-minimap" aria-label="الخريطة المصغرة: انقر لتحريك الكاميرا" title="انقر لتحريك الكاميرا، Shift لإصدار أمر للجيش المحدد"></button><div class="camera-tools" aria-label="التحكم بالكاميرا"><button data-camera="in" aria-label="تقريب الكاميرا">＋</button><button data-camera="out" aria-label="إبعاد الكاميرا">−</button><button data-camera="left" aria-label="تدوير الكاميرا لليسار">↶</button><button data-camera="right" aria-label="تدوير الكاميرا لليمين">↷</button><button data-camera="focus" aria-label="التركيز على الجيش">◎</button><button data-camera="home" aria-label="إعادة ضبط الكاميرا">⌂</button></div><div class="rts-result hidden" role="status"></div></div>
+    <aside class="rts-panel" id="game-commands"><button class="mobile-game-only" data-game="multiselect" aria-pressed="false">تحديد متعدد باللمس</button><div class="map-preview"></div><div class="rts-mission"><span></span><h2></h2><p></p></div><h3>إنشاء مبانٍ</h3><div class="build-buttons"></div><button data-game="autoplace">بناء في مكان مقترح</button><h3>تدريب الوحدات</h3><div class="train-buttons"></div><p class="rts-help">اختر مبنى ثم انقر الأرض، أو استخدم المكان المقترح. حدد الوحدات ثم انقر للتحرك أو الهجوم. عجلة الفأرة للتقريب، والزر الأوسط لتدوير الكاميرا، وإصبعان على الهاتف.</p></aside></div>
+    <nav class="battle-actions" aria-label="أوامر المعركة"><button class="mobile-game-only" data-game="commands" aria-expanded="false" aria-controls="game-commands">بناء وتدريب</button><button data-game="select">تحديد الجيش</button><button data-game="attack">هجوم على مقر العدو</button><button class="mobile-game-only" data-game="maps" aria-expanded="false" aria-controls="game-maps">الخرائط والصوت</button></nav>
     <footer class="rts-footer"><span class="rts-message" role="status"></span><span>أزرق: أنت · أحمر: العدو</span></footer><p class="campaign-save" role="status"></p><p class="sound-status" role="status">الصوت متوقف حتى تضغط «تشغيل الأصوات».</p>
     <details class="rts-instructions"><summary>طريقة اللعب وحفظ التقدم</summary><p>كل مرحلة لها وحداتها وساحة مختلفة. مراكز الإمداد تمنح $180 كل ٥ ثوانٍ. الثكنة والمصنع والمطار والميناء تتطلب طاقة. الغواصات تستخدم الطوربيدات ضد السفن والغواصات؛ المقاتلات لا تهاجم الغواصات. انقر وحدة لتحديدها وShift لإضافة وحدات. دمّر مقر العدو للفوز وفتح زر المرحلة التالية. جميع المراحل متاحة للتجربة من القائمة. تُحفظ المراحل المكتملة محليًا؛ المعركة الجارية تبدأ من جديد عند إغلاق النافذة. اللعبة أصلية ولا تستخدم ملفات Generals.</p></details></div>`;
   const canvas = content.querySelector("canvas"),
@@ -42,6 +45,39 @@ export function setupGame(content) {
     select = content.querySelector('[aria-label="اختيار المرحلة"]');
   const mapSelect = content.querySelector('[aria-label="اختيار الخريطة"]'),
     minimap = content.querySelector(".battle-minimap");
+  let multiSelect = false;
+  const shell = content.querySelector(".rts-app");
+  function drawer(kind) {
+    const shouldOpen = !shell.classList.contains(`${kind}-open`);
+    shell.classList.remove("commands-open", "maps-open");
+    if (shouldOpen) shell.classList.add(`${kind}-open`);
+    syncDrawers();
+  }
+  function syncDrawers() {
+    for (const kind of ["commands", "maps"])
+      content
+        .querySelector(`[data-game="${kind}"]`)
+        .setAttribute(
+          "aria-expanded",
+          String(shell.classList.contains(`${kind}-open`)),
+        );
+  }
+  content.querySelector('[data-game="commands"]').onclick = () =>
+    drawer("commands");
+  content.querySelector('[data-game="maps"]').onclick = () => drawer("maps");
+  content.querySelector('[data-game="multiselect"]').onclick = (event) => {
+    multiSelect = !multiSelect;
+    event.currentTarget.setAttribute("aria-pressed", String(multiSelect));
+  };
+  content.querySelector('[aria-label="مستوى الصوت للجوال"]').oninput = (
+    event,
+  ) => {
+    audio.setVolume(Number(event.target.value) / 100);
+    content.querySelector('[aria-label="مستوى صوت اللعبة"]').value =
+      event.target.value;
+  };
+  content.querySelector('[data-game="place-touch"]').onclick = () =>
+    content.querySelector('[data-game="autoplace"]').click();
   let battle,
     view,
     building = null,
@@ -71,6 +107,19 @@ export function setupGame(content) {
   function refresh() {
     const soundButton = content.querySelector('[data-sound="toggle"]');
     text(soundButton, audio.enabled ? "كتم الأصوات" : "تشغيل الأصوات");
+    soundButton.setAttribute(
+      "aria-label",
+      audio.enabled ? "كتم الأصوات" : "تشغيل الأصوات",
+    );
+    shell.classList.toggle("is-placing", Boolean(building));
+    content
+      .querySelector('[data-game="pause"]')
+      .setAttribute("aria-label", battle.paused ? "متابعة" : "إيقاف مؤقت");
+    content
+      .querySelector('[data-game="pause"]')
+      .setAttribute("aria-pressed", String(battle.paused));
+    content.querySelector('[data-stat="wave"]').dataset.short =
+      `${battle.wave}/${battle.stage.waves} · ${Math.max(0, Math.ceil(battle.nextWave - battle.time))}ث`;
     soundButton.setAttribute("aria-pressed", String(audio.enabled));
     soundButton.dataset.audioState = audio.context?.state || "not-started";
     minimap.innerHTML = mapSvg(
@@ -191,6 +240,10 @@ export function setupGame(content) {
       (b) =>
         (b.onclick = () => {
           building = building === b.dataset.build ? null : b.dataset.build;
+          if (matchMedia(COMPACT_QUERY).matches) {
+            shell.classList.remove("commands-open");
+            syncDrawers();
+          }
           refresh();
         }),
     );
@@ -213,7 +266,11 @@ export function setupGame(content) {
     }
     refresh();
   }
-  mapSelect.onchange = () => start(battle.stageIndex, mapSelect.value);
+  mapSelect.onchange = () => {
+    start(battle.stageIndex, mapSelect.value);
+    shell.classList.remove("maps-open");
+    syncDrawers();
+  };
   content.querySelector('[data-sound="toggle"]').onclick = async () => {
     const status = content.querySelector(".sound-status");
     try {
@@ -330,11 +387,17 @@ export function setupGame(content) {
     interact(event);
   };
   let touchStart,
-    touchGesture = false;
+    touchGesture = false,
+    touchDragged = false,
+    previousTouch = null;
   const fingers = new Set();
   canvas.addEventListener("pointerdown", (event) => {
     if (event.pointerType === "touch") {
       fingers.add(event.pointerId);
+      if (fingers.size === 1) {
+        touchDragged = false;
+        previousTouch = { x: event.clientX, y: event.clientY };
+      }
       if (fingers.size > 1) touchGesture = true;
       touchStart = {
         x: event.clientX,
@@ -344,10 +407,33 @@ export function setupGame(content) {
       };
     }
   });
+  canvas.onpointermove = (event) => {
+    if (
+      event.pointerType !== "touch" ||
+      fingers.size !== 1 ||
+      touchGesture ||
+      !touchStart ||
+      !previousTouch
+    )
+      return;
+    if (
+      Math.hypot(event.clientX - touchStart.x, event.clientY - touchStart.y) > 8
+    )
+      touchDragged = true;
+    if (touchDragged) {
+      view?.panPixels(
+        event.clientX - previousTouch.x,
+        event.clientY - previousTouch.y,
+      );
+      event.preventDefault();
+    }
+    previousTouch = { x: event.clientX, y: event.clientY };
+  };
   canvas.onpointerup = (event) => {
     if (
       event.pointerType === "touch" &&
       !touchGesture &&
+      !touchDragged &&
       touchStart?.id === event.pointerId &&
       Math.hypot(event.clientX - touchStart.x, event.clientY - touchStart.y) <
         8 &&
@@ -373,8 +459,10 @@ export function setupGame(content) {
     } else {
       const entity = battle.entities.find((e) => e.id === point.entityId);
       if (event.button !== 2 && entity?.team === "blue" && entity.speed) {
-        if (!event.shiftKey) battle.selected.clear();
-        battle.selected.add(entity.id);
+        if (!event.shiftKey && !multiSelect) battle.selected.clear();
+        if (multiSelect && battle.selected.has(entity.id))
+          battle.selected.delete(entity.id);
+        else battle.selected.add(entity.id);
       } else if (battle.selected.size) battle.command(point.x, point.y);
       else battle.selectAt(point.x, point.y, event.shiftKey);
     }
@@ -384,6 +472,8 @@ export function setupGame(content) {
   content.onkeydown = (e) => {
     if (e.key === "Escape") {
       building = null;
+      shell.classList.remove("maps-open", "commands-open");
+      syncDrawers();
       refresh();
     }
   };
@@ -425,6 +515,7 @@ export function setupGame(content) {
     view?.dispose(true);
     content.onkeydown = null;
     canvas.onpointerdown = null;
+    canvas.onpointermove = null;
     canvas.onpointerup = null;
     canvas.onpointercancel = null;
   };

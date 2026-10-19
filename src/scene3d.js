@@ -18,7 +18,8 @@ export function createBattleScene(canvas, stage, map = mapFor(0)) {
     alpha: false,
     powerPreference: "high-performance",
   });
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 1.6));
+  const touchDevice = matchMedia("(pointer: coarse)").matches;
+  renderer.setPixelRatio(Math.min(devicePixelRatio, touchDevice ? 1.15 : 1.6));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -49,8 +50,25 @@ export function createBattleScene(canvas, stage, map = mapFor(0)) {
   };
   controls.touches = { ONE: null, TWO: THREE.TOUCH.DOLLY_ROTATE };
   const home = () => {
-    camera.position.set(470, 860, 870);
-    controls.target.set(0, 0, 0);
+    if (touchDevice) {
+      const landscape =
+        canvas.clientWidth / Math.max(1, canvas.clientHeight) > 1.7;
+      controls.target.set(
+        landscape ? 0 : -250,
+        0,
+        !landscape && stage.terrain === "coast" ? -100 : 0,
+      );
+      camera.position
+        .copy(controls.target)
+        .add(
+          landscape
+            ? new THREE.Vector3(300, 550, 520)
+            : new THREE.Vector3(280, 620, 620),
+        );
+    } else {
+      camera.position.set(470, 860, 870);
+      controls.target.set(0, 0, 0);
+    }
     controls.update();
   };
   home();
@@ -64,7 +82,7 @@ export function createBattleScene(canvas, stage, map = mapFor(0)) {
   const sun = new THREE.DirectionalLight(underwater ? 0x58c4f8 : 0xfff0ca, 3);
   sun.position.set(-350, 750, 200);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(1024, 1024);
+  sun.shadow.mapSize.set(touchDevice ? 512 : 1024, touchDevice ? 512 : 1024);
   Object.assign(sun.shadow.camera, {
     left: -650,
     right: 650,
@@ -376,6 +394,7 @@ export function createBattleScene(canvas, stage, map = mapFor(0)) {
   const lines = new THREE.LineSegments(effectGeo, effectMat);
   lines.frustumCulled = false;
   scene.add(lines);
+  let lastOrientation = null;
   let lastWidth = 0,
     lastHeight = 0;
   const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0),
@@ -402,6 +421,11 @@ export function createBattleScene(canvas, stage, map = mapFor(0)) {
       renderer.setSize(w, h, false);
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
+      const orientation = w / h > 1.7;
+      if (touchDevice && orientation !== lastOrientation) {
+        lastOrientation = orientation;
+        home();
+      }
     }
     const living = new Set(battle.entities.map((e) => e.id));
     for (const [id, model] of models)
@@ -525,6 +549,31 @@ export function createBattleScene(canvas, stage, map = mapFor(0)) {
         Math.max(-290, Math.min(290, y - 310)),
       );
       camera.position.copy(controls.target).add(offset);
+      controls.update();
+    },
+    panPixels(dx, dy) {
+      const scale =
+        (camera.position.distanceTo(controls.target) *
+          Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) *
+          2) /
+        Math.max(1, canvas.clientHeight);
+      const right = new THREE.Vector3().setFromMatrixColumn(
+        camera.matrixWorld,
+        0,
+      );
+      right.y = 0;
+      right.normalize();
+      const up = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1);
+      up.y = 0;
+      up.normalize();
+      const delta = right
+        .multiplyScalar(-dx * scale)
+        .add(up.multiplyScalar(dy * scale));
+      const x = Math.max(-550, Math.min(550, controls.target.x + delta.x)),
+        z = Math.max(-330, Math.min(330, controls.target.z + delta.z));
+      delta.set(x - controls.target.x, 0, z - controls.target.z);
+      camera.position.add(delta);
+      controls.target.add(delta);
       controls.update();
     },
     cameraTarget() {

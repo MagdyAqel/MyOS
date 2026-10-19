@@ -1,0 +1,442 @@
+.mobile-game-only {
+  display: none !important;
+}
+.battle-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  padding: 9px;
+  background: #162c35;
+  border-top: 1px solid #3b5863;
+}
+.battle-actions button {
+  min-height: 40px;
+  padding: 9px 25px;
+}
+.rts-footer {
+  margin-top: 0;
+}
+@media (max-width: 650px),
+  (max-width: 950px) and (max-height: 500px),
+  (pointer: coarse) and (max-width: 1024px) {
+  .mobile-game-only {
+    display: block !important;
+  }
+  .game-window .window-content {
+    overflow: hidden;
+  }
+  .rts-app {
+    height: 100%;
+    min-height: 0;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .rts-header {
+    flex-shrink: 0;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 8px;
+    min-height: 58px;
+  }
+  .rts-header > div:first-child {
+    width: auto;
+    max-width: 76px;
+    flex-shrink: 0;
+  }
+  .rts-header .eyebrow {
+    display: none;
+  }
+  .rts-header strong {
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  .rts-header .rts-stats {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    font-size: 9px;
+  }
+  .rts-stats [data-stat="cash"] {
+    font-size: 15px;
+    line-height: 1.3;
+  }
+  .rts-stats [data-stat="wave"] {
+    font-size: 0;
+    line-height: 1.2;
+  }
+  .rts-stats [data-stat="wave"]:after {
+    content: attr(data-short);
+    font-size: 9px;
+  }
+  .rts-stats [data-stat="army"] {
+    font-size: 9px;
+    white-space: nowrap;
+    line-height: 1.4;
+  }
+  .rts-header > button,
+  .rts-header .sound-controls button {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    padding: 0;
+    font-size: 0 !important;
+  }
+  .rts-header > button[data-game="pause"]:after {
+    content: "II";
+    font: 22px Arial;
+  }
+  .rts-header > button[data-game="pause"][aria-pressed="true"]:after {
+    content: "▶";
+    font-size: 19px;
+  }
+  .rts-header > button[data-game="restart"]:after {
+    content: "↻";
+    font: 25px Arial;
+  }
+  .rts-header .sound-controls {
+    order: initial;
+    gap: 0;
+  }
+  .sound-controls label {
+    display: none !important;
+  }
+  .sound-controls [data-sound="toggle"]:after {
+    content: "🔇";
+    font-size: 20px;
+  }
+  .sound-controls [data-sound="toggle"][aria-pressed="true"]:after {
+    content: "🔊";
+  }
+  .rts-header > button {
+    order: initial;
+  }
+  .rts-layout {
+    display: block;
+    flex: 1;
+    min-height: 0;
+    position: relative;
+    overflow: hidden;
+  }
+  .battlefield {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    flex: none;
+    min-height: 0;
+  }
+  .battlefield canvas {
+    width: 100% !important;
+    height: 100% !important;
+    aspect-ratio: auto;
+    max-width: none;
+    max-height: none;
+    min-height: 0;
+  }
+  .scene-badge {
+    top: 8px;
+    left: 8px;
+    font-size: 8px;
+    padding: 6px;
+  }
+  .touch-hint {
+    position: absolute;
+    top: 35px;
+    left: 8px;
+    right: 8px;
+    text-align: left;
+    font-size: 9px;
+    color: #ecf5f9;
+    text-shadow: 0 1px 4px #000;
+    pointer-events: none;
+  }
+  .battle-minimap {
+    width: 96px;
+    right: 8px;
+    bottom: 62px;
+    padding: 3px !important;
+  }
+  .camera-tools {
+    bottom: 8px;
+    left: 8px;
+    right: 8px;
+    justify-content: center;
+    gap: 5px;
+  }
+  .camera-tools button {
+    width: 44px;
+    height: 44px;
+    font-size: 21px;
+    min-width: 0;
+    flex: 1;
+    max-width: 54px;
+  }
+  .battle-actions {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 5px;
+    flex-shrink: 0;
+    padding: 6px 8px;
+    background: #10252e;
+  }
+  .battle-actions button {
+    min-width: 0;
+    min-height: 48px;
+    height: auto;
+    padding: 5px;
+    font-size: 11px;
+    line-height: 1.5;
+    border-color: #3e6472;
+  }
+  .battle-actions [aria-expanded="true"] {
+    border-color: #90d5d7;
+    background: #284e59;
+  }
+  .rts-panel {
+    display: none;
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    width: auto;
+    max-height: calc(100% - 12px);
+    overflow: auto;
+    overscroll-behavior: contain;
+    background: #112a33f5;
+    backdrop-filter: blur(16px);
+    border: 1px solid #628590;
+    border-radius: 10px;
+    padding: 12px;
+    z-index: 8;
+    box-shadow: 0 8px 35px #0007;
+    scrollbar-width: thin;
+  }
+  .commands-open .rts-panel {
+    display: block;
+  }
+  .rts-panel .rts-mission,
+  .rts-panel .map-preview,
+  .rts-panel .rts-help {
+    display: none;
+  }
+  .rts-panel h3 {
+    font-size: 12px;
+    margin: 12px 0 8px;
+  }
+  .rts-panel button {
+    min-height: 44px;
+    font-size: 12px;
+  }
+  .rts-panel .build-buttons {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .rts-panel .build-buttons button {
+    font-size: 11px;
+    min-height: 54px;
+    padding: 7px 4px;
+  }
+  .rts-panel .train-buttons {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .rts-panel > button {
+    width: 100%;
+    margin: 6px 0 0;
+    display: block;
+  }
+  .rts-panel [data-game="multiselect"] {
+    color: #a5dcdf;
+    border-color: #4c8f95;
+  }
+  .rts-panel [data-game="multiselect"][aria-pressed="true"] {
+    background: #25605c;
+  }
+  .rts-app .campaign-bar {
+    display: none;
+    position: absolute;
+    top: 62px;
+    left: 8px;
+    right: 8px;
+    width: auto;
+    max-height: calc(100% - 140px);
+    overflow: auto;
+    overscroll-behavior: contain;
+    z-index: 10;
+    background: #112a33f5;
+    backdrop-filter: blur(16px);
+    padding: 14px;
+    border: 1px solid #628590;
+    border-radius: 10px;
+    box-shadow: 0 8px 35px #0007;
+  }
+  .maps-open .campaign-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .campaign-bar label {
+    width: 100%;
+    font-size: 12px;
+    display: block;
+  }
+  .campaign-bar select {
+    width: 100%;
+    max-width: none;
+    min-height: 44px;
+    font-size: 16px;
+    margin-top: 6px;
+    padding: 8px;
+  }
+  .campaign-bar .mobile-volume {
+    display: flex !important;
+    align-items: center;
+    gap: 10px;
+  }
+  .mobile-volume input {
+    flex: 1;
+    min-width: 0;
+    min-height: 44px;
+    accent-color: #8ed2ca;
+  }
+  .campaign-bar small {
+    display: block;
+    width: 100%;
+    font-size: 10px;
+  }
+  .campaign-bar button {
+    min-height: 44px;
+    font-size: 12px;
+  }
+  .campaign-progress {
+    font-size: 11px;
+  }
+  .mobile-placement {
+    display: none !important;
+    position: absolute;
+    top: 58px;
+    left: 12px;
+    right: 12px;
+    min-height: 48px;
+    z-index: 3;
+    background: #184b5aea !important;
+    border-color: #87d5d4 !important;
+    font-size: 13px !important;
+  }
+  .is-placing .mobile-placement {
+    display: block !important;
+  }
+  .rts-footer {
+    flex-shrink: 0;
+    min-height: 32px;
+    max-height: 58px;
+    overflow: auto;
+    padding: 7px 10px;
+    font-size: 10px;
+    line-height: 1.6;
+    margin: 0;
+  }
+  .rts-footer > span:last-child {
+    display: none;
+  }
+  .campaign-save,
+  .sound-status,
+  .rts-instructions {
+    display: none;
+  }
+  .rts-result {
+    font-size: 16px;
+    padding: 16px;
+    max-width: 280px;
+    max-height: 60%;
+    overflow: auto;
+  }
+}
+@media (max-width: 950px) and (max-height: 500px) {
+  .rts-header {
+    min-height: 48px;
+    padding: 2px 10px;
+  }
+  .rts-header > div:first-child {
+    max-width: 140px;
+  }
+  .rts-header strong {
+    font-size: 13px;
+  }
+  .rts-header .rts-stats {
+    flex-direction: row;
+    justify-content: center;
+    gap: 16px;
+  }
+  .rts-stats [data-stat="army"] {
+    font-size: 10px;
+  }
+  .rts-stats [data-stat="wave"]:after {
+    font-size: 11px;
+  }
+  .battle-actions {
+    padding: 4px 8px;
+    grid-template-columns: repeat(4, minmax(0, 160px));
+    justify-content: center;
+  }
+  .battle-actions button {
+    min-height: 44px;
+    font-size: 11px;
+  }
+  .rts-footer {
+    min-height: 26px;
+    max-height: 26px;
+    padding: 5px 10px;
+    font-size: 10px;
+  }
+  .rts-panel {
+    max-width: 450px;
+    left: auto;
+    width: calc(60% - 16px);
+    max-height: calc(100% - 12px);
+  }
+  .rts-app .campaign-bar {
+    top: 52px;
+    max-width: 450px;
+    left: auto;
+    width: calc(60% - 16px);
+    max-height: calc(100% - 80px);
+  }
+  .campaign-bar label {
+    width: calc(50% - 6px);
+  }
+  .campaign-bar .mobile-volume {
+    width: 100%;
+  }
+  .campaign-bar select {
+    font-size: 14px;
+  }
+  .touch-hint {
+    display: none !important;
+  }
+  .camera-tools {
+    right: auto;
+    gap: 4px;
+    justify-content: flex-start;
+  }
+  .camera-tools button {
+    width: 42px;
+    height: 44px;
+    flex: none;
+  }
+  .battle-minimap {
+    bottom: 10px;
+    right: 10px;
+    width: 115px;
+  }
+  .rts-result {
+    font-size: 14px;
+    padding: 12px;
+  }
+}

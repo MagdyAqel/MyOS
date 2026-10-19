@@ -3,6 +3,7 @@ import { setupBrowser } from './browser.js';
 import { setupNotes } from './notes.js';
 import { bootDesktop, DEVELOPER } from './boot.js';
 import { createWallpaperManager, setupPersonalization } from './wallpapers.js';
+import { setupMobileViewport } from './mobile.js';
 
 const apps = [
   {id:'files', name:'مستكشف الملفات', icon:'📁', color:'#ffcb55'},
@@ -79,7 +80,7 @@ function openApp(id){
   if(id==='calculator') setupCalculator(content);
   if(id==='files') setupFiles(content);
   if(id==='settings')w.cleanup=setupPersonalization(content,wallpaperManager,setTheme);
-  if(id==='about')content.innerHTML='<div class="about-page"><span class="about-mark">◈</span><h2>MyOS</h2><p>سطح مكتب صغير. احتمالات كبيرة.</p><p class="muted">محاكاة تفاعلية مستوحاة من ويندوز 11 تعمل داخل المتصفح.<br>ليست نظام تشغيل حقيقيًا، ولا تشغّل برامج Windows.</p><span class="version">الإصدار 2.1 · Develped by:Pro. Magdy S. Aqel</span></div>';
+  if(id==='about')content.innerHTML='<div class="about-page"><span class="about-mark">◈</span><h2>MyOS</h2><p>سطح مكتب صغير. احتمالات كبيرة.</p><p class="muted">محاكاة تفاعلية مستوحاة من ويندوز 11 تعمل داخل المتصفح.<br>ليست نظام تشغيل حقيقيًا، ولا تشغّل برامج Windows.</p><span class="version">الإصدار 2.2 · Develped by:Pro. Magdy S. Aqel</span></div>';
 }
 const wallpaperManager=createWallpaperManager();
 function setupFiles(content){
@@ -96,4 +97,5 @@ function setupCalculator(content){
   for(const key of ['C','±','%','÷','7','8','9','×','4','5','6','−','1','2','3','+','⌫','0','.','=']){const b=document.createElement('button');b.textContent=key;if(key==='=')b.className='equals';b.onclick=()=>{if(/^[0-9.]$/.test(key)){if(fresh||display==='خطأ'){display=key==='.'?'0.':key;fresh=false;}else if(key!=='.'||!display.includes('.'))display=display==='0'&&key!=='.'?key:display+key;}else if(key==='C'){display='0';stored=null;operator=null;fresh=true;}else if(key==='⌫'){display=display.slice(0,-1)||'0';}else if(key==='±'){display=String(-Number(display));}else if(key==='%'){display=String(Number(display)/100);}else if(key==='='){calculate();fresh=true;}else{if(!fresh)calculate();stored=Number(display);operator=key;fresh=true;}output.textContent=display;};content.querySelector('.calc-keys').append(b);}
 }
 
+setupMobileViewport();
 bootDesktop();
