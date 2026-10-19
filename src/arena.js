@@ -15,7 +15,11 @@ export function setupArena(content, { openGame }) {
     room = content.querySelector(".arena-room");
   let connection = null,
     closed = false,
-    busy = false;
+    busy = false,
+    endpointEdited = false;
+  endpoint.oninput = () => {
+    endpointEdited = true;
+  };
   const tell = (text) => {
     if (!closed) status.textContent = text;
   };
@@ -31,28 +35,59 @@ export function setupArena(content, { openGame }) {
   }
   try {
     if (!endpoint.value)
-      endpoint.value =
-        localStorage.getItem("myos-multiplayer-endpoint-v1") || "";
+      endpoint.value = validateEndpoint(
+        localStorage.getItem("myos-multiplayer-endpoint-v1"),
+      );
   } catch {}
-  if (!endpoint.value)
-    fetch(
-      new URL(`${import.meta.env.BASE_URL}multiplayer.json`, document.baseURI),
-      { cache: "no-store" },
-    )
-      .then((r) => r.json())
-      .then((config) => {
-        if (closed || endpoint.value) return;
-        if (config.endpoint) endpoint.value = validateEndpoint(config.endpoint);
-        else {
-          content.querySelector(".arena-config").open = true;
-          tell(
-            "خادم المواجهة لم يُربط بهذا الموقع بعد. أدخل عنوانه بعد نشره على Cloudflare.",
-          );
-        }
-      })
-      .catch(() => {
-        if (!closed) content.querySelector(".arena-config").open = true;
-      });
+  const preferredEndpoint = Boolean(endpoint.value);
+  if (!endpoint.value) {
+    try {
+      endpoint.value = validateEndpoint(
+        import.meta.env.VITE_MYOS_MULTIPLAYER_ENDPOINT,
+      );
+    } catch {
+      /* A custom installation can still configure its server below. */
+    }
+  }
+  const initialEndpoint = endpoint.value;
+  const configController = new AbortController();
+  const configTimeout = setTimeout(() => configController.abort(), 6000);
+  const configUrl = new URL(
+    `${import.meta.env.BASE_URL}multiplayer.json`,
+    document.baseURI,
+  );
+  // Old workers cache the exact asset URL; this also reaches fresh settings before an update activates.
+  configUrl.searchParams.set("config", "current");
+  fetch(configUrl, { cache: "no-store", signal: configController.signal })
+    .then((r) => {
+      if (!r.ok) throw Error("تعذّر تحميل إعداد خادم اللعب");
+      return r.json();
+    })
+    .then((config) => {
+      if (
+        closed ||
+        preferredEndpoint ||
+        endpointEdited ||
+        connection ||
+        busy ||
+        endpoint.value !== initialEndpoint
+      )
+        return;
+      if (config.endpoint) endpoint.value = validateEndpoint(config.endpoint);
+      else if (!endpoint.value) {
+        content.querySelector(".arena-config").open = true;
+        tell(
+          "خادم المواجهة لم يُربط بهذا الموقع بعد. أدخل عنوانه بعد نشره على Cloudflare.",
+        );
+      }
+    })
+    .catch(() => {
+      if (!closed && !endpoint.value) {
+        content.querySelector(".arena-config").open = true;
+        tell("تعذّر تحميل إعداد خادم اللعب؛ أدخل عنوان الخادم في الخانة أعلاه");
+      }
+    })
+    .finally(() => clearTimeout(configTimeout));
   function observe() {
     if (!connection || closed) return;
     room.classList.remove("hidden");
@@ -108,6 +143,11 @@ export function setupArena(content, { openGame }) {
     try {
       await operation();
     } catch (error) {
+      try {
+        validateEndpoint(endpoint.value);
+      } catch {
+        content.querySelector(".arena-config").open = true;
+      }
       tell(error.message || "تعذّر الاتصال");
     } finally {
       lock(false);
@@ -130,8 +170,13 @@ export function setupArena(content, { openGame }) {
       let id = code.value.trim(),
         server = endpoint.value;
       if (id.includes("://")) {
-        const link = new URL(id),
-          params = new URLSearchParams(link.hash.slice(1));
+        let link;
+        try {
+          link = new URL(id);
+        } catch {
+          throw Error("أدخل رمز الغرفة الكامل أو رابط دعوة صالحًا");
+        }
+        const params = new URLSearchParams(link.hash.slice(1));
         id = params.get("myos-room") || "";
         server = params.get("server") || server;
         endpoint.value = server;
@@ -180,6 +225,8 @@ export function setupArena(content, { openGame }) {
   if (active && !active.closed) attach(active.session);
   return () => {
     closed = true;
+    clearTimeout(configTimeout);
+    configController.abort();
     detach();
   };
 }

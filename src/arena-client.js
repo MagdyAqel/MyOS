@@ -1,6 +1,13 @@
 export const SESSION_KEY = "myos-online-session-v1";
 export function validateEndpoint(value) {
-  const u = new URL(value);
+  if (typeof value !== "string" || !value.trim())
+    throw Error("أدخل عنوان خادم اللعب أولًا");
+  let u;
+  try {
+    u = new URL(value.trim());
+  } catch {
+    throw Error("عنوان خادم اللعب غير صالح؛ أدخل عنوان HTTPS كاملًا");
+  }
   if (
     u.username ||
     u.password ||
@@ -28,7 +35,11 @@ export async function roomRequest(endpoint, path, body) {
       credentials: "omit",
       cache: "no-store",
     });
-    const data = await response.json();
+    const data = await response.json().catch(() => {
+      throw Error(
+        "لم يُرجع خادم اللعب بيانات غرفة صالحة؛ تحقق من عنوانه وحاول مجددًا",
+      );
+    });
     if (!response.ok) throw Error(data.error || "تعذّر الاتصال بالغرفة");
     if (
       !/^[a-f0-9]{32}$/.test(data.room) ||
@@ -39,6 +50,8 @@ export async function roomRequest(endpoint, path, body) {
     return { ...data, endpoint: validateEndpoint(endpoint) };
   } catch (e) {
     if (e.name === "AbortError") throw Error("انتهت مهلة اتصال خادم اللعب");
+    if (e instanceof TypeError)
+      throw Error("تعذّر الاتصال بخادم اللعب؛ تحقق من الإنترنت وعنوان الخادم");
     throw e;
   } finally {
     clearTimeout(timer);

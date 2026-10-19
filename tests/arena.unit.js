@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { RoomCore } from "../multiplayer/room-core.js";
 import { restoreBattle } from "../src/battle-save.js";
-import { validateEndpoint } from "../src/arena-client.js";
+import { validateEndpoint, roomRequest } from "../src/arena-client.js";
 const run = (room, seconds) => {
   for (let i = 0; i < seconds * 20; i++) room.tick(0.05);
 };
@@ -127,4 +127,20 @@ test("multiplayer endpoints require HTTPS outside loopback and reject embedded c
   );
   assert.throws(() => validateEndpoint("http://example.com"));
   assert.throws(() => validateEndpoint("https://user:pass@example.com"));
+});
+
+test("blank and malformed room endpoints report actionable errors before any network request", async () => {
+  assert.throws(() => validateEndpoint(""), /أدخل عنوان خادم اللعب أولًا/);
+  assert.throws(
+    () => validateEndpoint("not a URL"),
+    /عنوان خادم اللعب غير صالح/,
+  );
+  await assert.rejects(
+    roomRequest("", "/rooms"),
+    /أدخل عنوان خادم اللعب أولًا/,
+  );
+  assert.equal(
+    validateEndpoint("  https://myos.example.workers.dev  "),
+    "https://myos.example.workers.dev",
+  );
 });

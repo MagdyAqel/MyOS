@@ -3,6 +3,7 @@ async function openArena(page) {
   await page.goto("/");
   await page.getByRole("button", { name: "الدخول الآن", exact: true }).click();
   await page.locator("[data-task=arena]").click();
+  await page.locator(".arena-config summary").click();
   await page
     .getByRole("textbox", { name: "عنوان خادم اللعب", exact: true })
     .fill("http://127.0.0.1:8787");

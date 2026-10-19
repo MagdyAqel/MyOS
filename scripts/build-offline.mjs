@@ -35,7 +35,8 @@ self.addEventListener('message',event=>{if(event.data?.type==='SKIP_WAITING')sel
 self.addEventListener('fetch',event=>{
  const request=event.request,url=new URL(request.url);
  if(request.method!=='GET'||url.origin!==SCOPE.origin||!url.pathname.startsWith(SCOPE.pathname))return;
- if(request.mode==='navigate')event.respondWith((async()=>{const abort=new AbortController(),timer=setTimeout(()=>abort.abort(),6000);try{const response=await fetch(request,{signal:abort.signal});if(response.ok)return response;}catch{}finally{clearTimeout(timer);}return (await caches.match(new URL('index.html',SCOPE).href))||new Response('Offline: open the app online once.',{status:503});})());
+ if(url.pathname===new URL('multiplayer.json',SCOPE).pathname)event.respondWith((async()=>{const cache=await caches.open(CACHE),key=new URL('multiplayer.json',SCOPE).href,abort=new AbortController(),timer=setTimeout(()=>abort.abort(),4000);try{const response=await fetch(request,{cache:'no-store',signal:abort.signal});if(response.ok){await cache.put(key,response.clone());return response;}}catch{}finally{clearTimeout(timer);}return (await cache.match(key))||new Response(JSON.stringify({endpoint:''}),{headers:{'Content-Type':'application/json'}});})());
+ else if(request.mode==='navigate')event.respondWith((async()=>{const abort=new AbortController(),timer=setTimeout(()=>abort.abort(),6000);try{const response=await fetch(request,{signal:abort.signal});if(response.ok)return response;}catch{}finally{clearTimeout(timer);}return (await caches.match(new URL('index.html',SCOPE).href))||new Response('Offline: open the app online once.',{status:503});})());
  else if(ASSETS.includes(url.href))event.respondWith(caches.open(CACHE).then(async cache=>(await cache.match(request))||fetch(request)));
 });
 `,

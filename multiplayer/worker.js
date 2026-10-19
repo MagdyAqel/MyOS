@@ -70,8 +70,13 @@ export default {
             request.headers.get("Upgrade")?.toLowerCase() !== "websocket")
         )
           return json({ error: "طلب غير صالح" }, 400);
+        // Joining needs only the room ID. Do not proxy an unread body stream to
+        // a Durable Object that can return before the stream finishes pumping.
+        if (path === "join" && request.body) await request.body.cancel();
         response = await env.ROOMS.getByName(match[1]).fetch(
-          new Request("https://internal/" + path, request),
+          path === "join"
+            ? new Request("https://internal/join", { method: "POST" })
+            : new Request("https://internal/ws", request),
         );
       }
       if (response.status === 101) return response;
