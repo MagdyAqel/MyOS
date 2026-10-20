@@ -1,9 +1,11 @@
+import { mapSize, mapX, mapY, mapPoint } from "./world.js";
 import {
   SUPPORT_TYPES,
   updateSupport,
   targetScore,
   startingMoney,
 } from "./battle-expansion.js";
+import { updateBuildingRepairs } from "./battle-orders.js";
 import { STAGES, FORCE_PHASES, OPERATION_PHASES } from "./campaign.js";
 import { mapFor, blocked } from "./maps.js";
 import { moveUnit, clearShot, walkable } from "./navigation.js";
@@ -198,6 +200,7 @@ export class Battle {
       );
     }
     this.map = mapFor(this.stageIndex, mapId);
+    Object.assign(this, mapSize(this.map));
     this.events = [];
     this.eventSequence = 0;
     this.nextId = 1;
@@ -221,55 +224,57 @@ export class Battle {
     );
     this.upgrades = normalizeUpgrades(options.upgrades);
     this.message = this.stage.description;
+    const spawn = (type, team, x, y) =>
+      this.add(type, team, mapX(this.map, x), mapY(this.map, y));
     const navy = this.stageIndex >= 2,
       abyss = this.stageIndex === 3;
-    this.add("hq", "blue", 130, navy && !abyss ? 140 : 320);
-    this.add("hq", "red", 880, navy && !abyss ? 140 : 300);
-    this.add("turret", "red", 780, navy && !abyss ? 165 : 240);
-    this.add("turret", "red", 800, navy && !abyss ? 70 : 380);
+    spawn("hq", "blue", 130, navy && !abyss ? 140 : 320);
+    spawn("hq", "red", 880, navy && !abyss ? 140 : 300);
+    spawn("turret", "red", 780, navy && !abyss ? 165 : 240);
+    spawn("turret", "red", 800, navy && !abyss ? 70 : 380);
     if (this.stageIndex === 0) {
-      this.add("soldier", "blue", 205, 285);
-      this.add("soldier", "blue", 205, 350);
-      this.add("tank", "blue", 210, 320);
+      spawn("soldier", "blue", 205, 285);
+      spawn("soldier", "blue", 205, 350);
+      spawn("tank", "blue", 210, 320);
     }
     if (this.stageIndex === 1) {
-      this.add("power", "blue", 80, 480);
-      this.add("airfield", "blue", 130, 150);
-      this.add("fighter", "blue", 230, 280);
-      this.add("fighter", "blue", 240, 360);
-      this.add("bomber", "blue", 190, 310);
-      this.add("tank", "blue", 240, 180);
-      this.add("soldier", "blue", 260, 220);
+      spawn("power", "blue", 80, 480);
+      spawn("airfield", "blue", 130, 150);
+      spawn("fighter", "blue", 230, 280);
+      spawn("fighter", "blue", 240, 360);
+      spawn("bomber", "blue", 190, 310);
+      spawn("tank", "blue", 240, 180);
+      spawn("soldier", "blue", 260, 220);
     }
     if (navy) {
-      this.add("power", "blue", 70, 70);
-      this.add("harbor", "blue", 160, 245);
-      this.add(abyss ? "submarine" : "destroyer", "blue", 220, 340);
-      this.add("submarine", "blue", 230, 420);
-      this.add(abyss ? "submarine" : "destroyer", "blue", 180, 500);
+      spawn("power", "blue", 70, 70);
+      spawn("harbor", "blue", 160, 245);
+      spawn(abyss ? "submarine" : "destroyer", "blue", 220, 340);
+      spawn("submarine", "blue", 230, 420);
+      spawn(abyss ? "submarine" : "destroyer", "blue", 180, 500);
     }
     if (this.stageIndex === 2) {
-      this.add("tank", "blue", 235, 135);
-      this.add("soldier", "blue", 210, 190);
-      this.add("soldier", "blue", 255, 190);
-      this.add("fighter", "blue", 275, 280);
-      this.add("bomber", "blue", 210, 420);
+      spawn("tank", "blue", 235, 135);
+      spawn("soldier", "blue", 210, 190);
+      spawn("soldier", "blue", 255, 190);
+      spawn("fighter", "blue", 275, 280);
+      spawn("bomber", "blue", 210, 420);
     }
     initializeSystems(this, options);
     initializeTactics(this, options);
-    if (this.mission.id === "recon") this.add("recon", "blue", 200, 450);
+    if (this.mission.id === "recon") spawn("recon", "blue", 200, 450);
     if (this.mission.id === "siege") {
-      if (!this.has("power")) this.add("power", "blue", 75, 75);
-      this.add("factory", "blue", 320, this.stageIndex === 2 ? 80 : 485);
-      this.add(
+      if (!this.has("power")) spawn("power", "blue", 75, 75);
+      spawn("factory", "blue", 320, this.stageIndex === 2 ? 80 : 485);
+      spawn(
         "airfield",
         "blue",
         this.stageIndex === 2 ? 420 : 100,
         this.stageIndex === 2 ? 155 : 150,
       );
-      this.add("artillery", "blue", 270, this.stageIndex === 2 ? 155 : 405);
-      this.add("apc", "blue", 235, this.stageIndex === 2 ? 205 : 350);
-      this.add("recon", "blue", 235, 460);
+      spawn("artillery", "blue", 270, this.stageIndex === 2 ? 155 : 405);
+      spawn("apc", "blue", 235, this.stageIndex === 2 ? 205 : 350);
+      spawn("recon", "blue", 235, 460);
     }
   }
   isVisible(entity, team = "blue") {
@@ -369,15 +374,17 @@ export class Battle {
   }
   constrain(unit, x, y) {
     return {
-      x: Math.max(20, Math.min(980, x)),
+      x: Math.max(20, Math.min(this.width - 20, x)),
       y: Math.max(
         unit.domain === "sea" || unit.domain === "sub"
           ? this.stageIndex === 2
-            ? 285
+            ? mapY(this.map, 285)
             : 25
           : 20,
         Math.min(
-          this.stageIndex === 2 && unit.domain === "ground" ? 230 : 595,
+          this.stageIndex === 2 && unit.domain === "ground"
+            ? mapY(this.map, 230)
+            : this.height - 25,
           y,
         ),
       ),
@@ -427,8 +434,8 @@ export class Battle {
       const n = this.entities.filter((e) => e.speed && e.team === team).length;
       x =
         team === "red"
-          ? Math.max(440, producer.x - 70 - (n % 3) * 20)
-          : Math.min(560, producer.x + 70 + (n % 3) * 20);
+          ? Math.max(mapX(this.map, 440), producer.x - 70 - (n % 3) * 20)
+          : Math.min(mapX(this.map, 560), producer.x + 70 + (n % 3) * 20);
       y =
         producer.y +
         (spec.domain === "sea" || spec.domain === "sub"
@@ -459,10 +466,13 @@ export class Battle {
       if (
         !Number.isFinite(x) ||
         !Number.isFinite(y) ||
-        x < (team === "red" ? 450 : spec.radius + 10) ||
-        x > (team === "red" ? WIDTH - spec.radius - 10 : 550) ||
+        x < (team === "red" ? mapX(this.map, 450) : spec.radius + 10) ||
+        x >
+          (team === "red"
+            ? this.width - spec.radius - 10
+            : mapX(this.map, 550)) ||
         y < spec.radius + 10 ||
-        y > HEIGHT - spec.radius - 10
+        y > this.height - spec.radius - 10
       ) {
         this.message =
           team === "red"
@@ -472,12 +482,14 @@ export class Battle {
       }
       if (
         this.stageIndex >= 2 &&
-        (type === "harbor" ? y < 215 || y > 260 : y > 200)
+        (type === "harbor"
+          ? y < mapY(this.map, 215) || y > mapY(this.map, 260)
+          : y > mapY(this.map, 200))
       ) {
         this.message =
           type === "harbor"
-            ? "ضع الميناء قرب الشاطئ بين خطّي 215 و260"
-            : "ابنِ منشآت الدعم في القطاع العلوي قبل خط 200";
+            ? "ضع الميناء قرب خط الشاطئ"
+            : "ابنِ منشآت الدعم في القطاع العلوي من اليابسة";
         return false;
       }
       if (blocked(this.map, x, y, spec.radius + 8)) {
@@ -558,6 +570,7 @@ export class Battle {
       }
       unit.route = null;
       unit.tactical = null;
+      delete unit.attackGoal;
       unit.stance = this.commandMode === "attackMove" ? "attackMove" : "normal";
       delete unit.recon;
       delete unit.boarding;
@@ -592,6 +605,7 @@ export class Battle {
     if (!this.multiplayer) updateEnemy(this, TYPES);
     updateLogistics(this, dt);
     updateSupport(this, dt);
+    updateBuildingRepairs(this, dt);
     advanceMission(this, dt);
     updateExploration(this);
     this.income += dt;
@@ -637,16 +651,19 @@ export class Battle {
         this.add(
           type,
           "red",
-          940,
-          this.stageIndex === 2
-            ? ["sea", "sub"].includes(TYPES[type].domain)
-              ? 320 + (i % 7) * 32
-              : TYPES[type].domain === "ground"
-                ? 70 + (i % 5) * 32
-                : 130 + (i % 6) * 60
-            : this.stageIndex === 3
-              ? 320 + i * 32
-              : 110 + i * 42,
+          mapX(this.map, 940),
+          mapY(
+            this.map,
+            this.stageIndex === 2
+              ? ["sea", "sub"].includes(TYPES[type].domain)
+                ? 320 + (i % 7) * 32
+                : TYPES[type].domain === "ground"
+                  ? 70 + (i % 5) * 32
+                  : 130 + (i % 6) * 60
+              : this.stageIndex === 3
+                ? 320 + i * 32
+                : 110 + i * 42,
+          ),
         );
       }
       this.message = `الموجة ${this.wave} تقترب! احمِ مركز القيادة.`;
@@ -684,14 +701,20 @@ export class Battle {
       const ordered = unit.order?.target
         ? opponents.find((e) => e.id === unit.order.target)
         : null;
-      if (unit.order?.target && !ordered) unit.order = null;
+      if (unit.order?.target && !ordered)
+        unit.order = unit.attackGoal ? { ...unit.attackGoal } : null;
       const nearby = opponents
         .filter(
           (e) =>
             distance(unit, e) <= unit.range + e.radius &&
             distance(unit, e) >= (unit.minRange || 0) &&
-            (unit.type !== "drone" || unit.order?.target === e.id) &&
-            (!unit.indirect || !unit.order || unit.order.target) &&
+            (unit.type !== "drone" ||
+              unit.order?.target === e.id ||
+              unit.stance === "attackMove") &&
+            (!unit.indirect ||
+              !unit.order ||
+              unit.order.target ||
+              unit.stance === "attackMove") &&
             (unit.indirect || clearShot(this.map, unit, e)),
         )
         .sort((a, b) => targetScore(unit, a) - targetScore(unit, b))[0];
@@ -728,14 +751,17 @@ export class Battle {
             });
           } else if (unit.type === "drone") {
             for (const victim of opponents)
-              if (distance(victim, target) < 55 + victim.radius) {
+              if (distance(victim, target) < 80 + victim.radius) {
                 const damage = Math.round(
                   unit.damage *
-                    Math.max(0.35, 1 - distance(victim, target) / 100),
+                    Math.max(0.35, 1 - distance(victim, target) / 130),
                 );
                 victim.hp -= damage;
                 recordDamage(this, unit.team, damage);
               }
+            unit.x = target.x;
+            unit.y = target.y;
+            unit.impactDomain = target.domain;
             unit.hp = 0;
           } else {
             target.hp -= unit.damage;
@@ -807,15 +833,19 @@ export class Battle {
           (unit.team === "red" && !this.multiplayer
             ? enemyHQ && this.isVisible(enemyHQ, "red")
               ? enemyHQ
-              : this.enemy.lastHQ || {
-                  x: 130,
-                  y: this.stageIndex === 2 ? 140 : 320,
-                }
+              : this.enemy.lastHQ ||
+                mapPoint(this.map, 130, this.stageIndex === 2 ? 140 : 320)
             : null);
         if (destination) {
           const point = this.constrain(unit, destination.x, destination.y);
-          if (moveUnit(unit, point, this.map, dt) && !ordered)
+          if (
+            moveUnit(unit, point, this.map, dt) &&
+            !ordered &&
+            !advanceTarget
+          ) {
             unit.order = null;
+            delete unit.attackGoal;
+          }
         }
       }
     }
@@ -843,8 +873,9 @@ export class Battle {
           heading: entity.heading || 0,
           x: entity.x,
           y: entity.y,
-          domain: entity.domain,
-          size: entity.radius,
+          domain: entity.impactDomain || entity.domain,
+          size:
+            entity.type === "drone" && entity.impactDomain ? 35 : entity.radius,
         });
     }
     this.entities = this.entities.filter((e) => e.hp > 0);

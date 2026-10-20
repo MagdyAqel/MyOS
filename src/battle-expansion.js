@@ -106,6 +106,7 @@ export function advancedOrder(b, action) {
   } else if (action.kind === "hold") {
     for (const unit of units) {
       unit.stance = "hold";
+      delete unit.attackGoal;
       unit.order = null;
       unit.route = null;
       unit.tactical = null;
@@ -117,6 +118,7 @@ export function advancedOrder(b, action) {
   } else if (action.kind === "retreat") {
     for (const unit of units) {
       unit.stance = "retreat";
+      delete unit.attackGoal;
       unit.tactical = null;
       delete unit.recon;
       delete unit.boarding;

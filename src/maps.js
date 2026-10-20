@@ -1,3 +1,4 @@
+import { mapSize, mapPoint, mapY } from "./world.js";
 export const MAPS = [
   {
     id: "dunes",
@@ -138,6 +139,83 @@ export const MAPS = [
     ],
   },
 ];
+export const LARGE_MAP_IDS = [
+  "great-divide",
+  "highland-front",
+  "island-front",
+  "deep-barrier",
+];
+const largeMaps = [
+  {
+    name: "الجبهة الكبرى",
+    description:
+      "ساحة واسعة 1600 × 1000؛ سلسلة صخرية تفصل الجيشين، مع ممر مركزي وطريقين للالتفاف شمالًا وجنوبًا.",
+    ground: "#b59770",
+    sky: "#c8d1d4",
+    obstacles: [
+      { x: 800, y: 240, r: 120, h: 140 },
+      { x: 800, y: 380, r: 100, h: 120 },
+      { x: 800, y: 660, r: 110, h: 135 },
+      { x: 800, y: 800, r: 100, h: 110 },
+      { x: 570, y: 730, r: 55, h: 65 },
+      { x: 1030, y: 730, r: 55, h: 65 },
+    ],
+  },
+  {
+    name: "مرتفعات الجبهة",
+    description:
+      "ساحة واسعة 1600 × 1000؛ حاجزان جبليان وممرات للمدرعات، والطيران يعبر فوق القمم.",
+    ground: "#778674",
+    sky: "#aabcc8",
+    obstacles: [
+      { x: 730, y: 310, r: 125, h: 160 },
+      { x: 870, y: 690, r: 125, h: 160 },
+      { x: 800, y: 460, r: 90, h: 115 },
+      { x: 800, y: 90, r: 55, h: 75 },
+      { x: 800, y: 910, r: 55, h: 75 },
+    ],
+  },
+  {
+    name: "جبهة الجزر",
+    description:
+      "ساحة واسعة 1600 × 1000؛ ممر بري بين الصخور، وجزر تفصل الأساطيل مع قنوات بحرية شمال الجزر وجنوبها.",
+    ground: "#cebb8d",
+    sky: "#a3cfdb",
+    obstacles: [
+      { x: 800, y: 120, r: 75, h: 100 },
+      { x: 800, y: 330, r: 55, h: 70 },
+      { x: 760, y: 620, r: 90, h: 50 },
+      { x: 840, y: 790, r: 80, h: 45 },
+      { x: 1080, y: 580, r: 45, h: 30 },
+      { x: 520, y: 580, r: 45, h: 30 },
+    ],
+  },
+  {
+    name: "حاجز الأعماق",
+    description:
+      "ساحة واسعة 1600 × 1000؛ حواجز شعاب بين الأسطولين، مع ممر مركزي ومسارات للالتفاف حول الصخور.",
+    ground: "#294e61",
+    sky: "#062b42",
+    obstacles: [
+      { x: 800, y: 230, r: 120, h: 100 },
+      { x: 800, y: 370, r: 100, h: 85 },
+      { x: 800, y: 680, r: 110, h: 100 },
+      { x: 800, y: 820, r: 90, h: 80 },
+      { x: 560, y: 670, r: 50, h: 65 },
+      { x: 1040, y: 670, r: 50, h: 65 },
+    ],
+  },
+];
+MAPS.push(
+  ...largeMaps.map((map, stage) => ({
+    ...map,
+    id: LARGE_MAP_IDS[stage],
+    stage,
+    width: 1600,
+    height: 1000,
+    seed: 113 + stage * 18,
+  })),
+);
 export function mapFor(stage, id) {
   return (
     MAPS.find((m) => m.stage === stage && m.id === id) ||
@@ -161,10 +239,12 @@ export function mapSvg(
   focus = null,
   mission = null,
 ) {
+  const { width, height } = mapSize(map);
+  const recon = mapPoint(map, 820, 470);
   entities = entities.filter((e) => !e.carriedBy);
   const water = map.stage >= 2;
   const color = map.stage === 3 ? "#163a4b" : water ? "#276d83" : map.ground;
-  return `<svg viewBox="0 0 1000 620" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect width="1000" height="620" fill="${color}"/>${map.stage === 2 ? '<rect width="1000" height="260" fill="#c9b78b"/>' : ""}<path d="M560 0V620" stroke="#ffffff35" stroke-dasharray="14 12" stroke-width="3"/>${map.obstacles.map((o) => `<circle cx="${o.x}" cy="${o.y}" r="${o.r}" fill="${water ? "#8f9173" : "#685c4c"}" stroke="#ffffff30" stroke-width="4"/>`).join("")}${mission === "recon" ? '<circle cx="820" cy="470" r="100" fill="none" stroke="#f2ce79" stroke-width="6"/>' : ""}${entities
+  return `<svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect width="${width}" height="${height}" fill="${color}"/>${map.stage === 2 ? `<rect width="${width}" height="${mapY(map, 260)}" fill="#c9b78b"/>` : ""}<path d="M${width / 2} 0V${height}" stroke="#ffffff35" stroke-dasharray="14 12" stroke-width="3"/>${map.obstacles.map((o) => `<circle cx="${o.x}" cy="${o.y}" r="${o.r}" fill="${water ? "#8f9173" : "#685c4c"}" stroke="#ffffff30" stroke-width="4"/>`).join("")}${mission === "recon" ? `<circle cx="${recon.x}" cy="${recon.y}" r="100" fill="none" stroke="#f2ce79" stroke-width="6"/>` : ""}${entities
     .filter(
       (e) => e.type === "recon" && e.team === "blue" && selected.has(e.id),
     )

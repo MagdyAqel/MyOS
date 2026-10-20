@@ -1,107 +1,30 @@
+import { mapSize, mapX, mapY } from "./world.js";
 import * as THREE from "three";
 import { seededRandom } from "./maps.js";
-export function enhanceEnvironment(scene, terrain, stage, map) {
+import { createTerrain } from "./terrain3d.js";
+import { QUALITY } from "./model-details.js";
+import { visionRadius } from "./unit-abilities.js";
+export function enhanceEnvironment(
+  scene,
+  terrain,
+  stage,
+  map,
+  renderer,
+  quality,
+) {
+  const { width, height } = mapSize(map);
+  const halfW = width / 2,
+    halfH = height / 2;
+  const landscape = createTerrain(
+    scene,
+    terrain,
+    stage,
+    map,
+    renderer,
+    quality,
+  );
   const random = seededRandom(map.seed),
-    textures = [],
-    extras = [];
-  const makeTexture = () => {
-    const canvas = document.createElement("canvas");
-    canvas.width = canvas.height = 512;
-    const ctx = canvas.getContext("2d");
-    ctx.fillStyle = map.ground;
-    ctx.fillRect(0, 0, 512, 512);
-    for (let i = 0; i < 42000; i++) {
-      const v = random() > 0.5 ? 255 : 0;
-      ctx.fillStyle = `rgba(${v},${v},${v},${random() * 0.1})`;
-      ctx.fillRect(
-        random() * 512,
-        random() * 512,
-        random() * 3 + 1,
-        random() * 2 + 1,
-      );
-    }
-    for (let i = 0; i < 200; i++) {
-      ctx.strokeStyle = "#312d2410";
-      ctx.beginPath();
-      const x = random() * 512,
-        y = random() * 512;
-      ctx.ellipse(x, y, random() * 12 + 2, random() * 5 + 1, 0, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-    texture.repeat.set(3, 2);
-    textures.push(texture);
-    return texture;
-  };
-  const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(1000, stage.terrain === "coast" ? 240 : 620),
-    new THREE.MeshStandardMaterial({ map: makeTexture(), roughness: 1 }),
-  );
-  floor.rotation.x = -Math.PI / 2;
-  floor.position.set(
-    0,
-    stage.terrain === "abyss" ? -20.8 : stage.terrain === "coast" ? 1.2 : -2.5,
-    stage.terrain === "coast" ? -190 : 0,
-  );
-  floor.receiveShadow = true;
-  terrain.add(floor);
-  extras.push(floor.material);
-  for (const obstacle of map.obstacles) {
-    const group = new THREE.Group();
-    group.position.set(
-      obstacle.x - 500,
-      stage.terrain === "abyss" ? -20 : 0,
-      obstacle.y - 310,
-    );
-    const stone = new THREE.MeshStandardMaterial({
-      color:
-        stage.terrain === "coast"
-          ? "#9b9a75"
-          : stage.terrain === "abyss"
-            ? "#496d71"
-            : "#81715b",
-      roughness: 0.95,
-    });
-    extras.push(stone);
-    for (let i = 0; i < 6; i++) {
-      const rock = new THREE.Mesh(
-        new THREE.DodecahedronGeometry(obstacle.r * (0.4 + random() * 0.2), 1),
-        stone,
-      );
-      const angle = (i / 6) * Math.PI * 2;
-      rock.position.set(
-        Math.cos(angle) * obstacle.r * 0.48,
-        obstacle.h * 0.2 + random() * obstacle.h * 0.15,
-        Math.sin(angle) * obstacle.r * 0.48,
-      );
-      rock.scale.set(1, (obstacle.h / obstacle.r) * (0.8 + random() * 0.5), 1);
-      rock.rotation.y = random() * Math.PI;
-      rock.castShadow = rock.receiveShadow = true;
-      group.add(rock);
-    }
-    terrain.add(group);
-  }
-  let sea;
-  if (stage.terrain === "coast") {
-    const geometry = new THREE.PlaneGeometry(1000, 360, 60, 24);
-    geometry.rotateX(-Math.PI / 2);
-    geometry.translate(0, 0, 130);
-    const waterMaterial = new THREE.MeshStandardMaterial({
-      color: "#348fa7",
-      roughness: 0.28,
-      metalness: 0.5,
-      transparent: true,
-      opacity: 0.6,
-      depthWrite: false,
-    });
-    sea = new THREE.Mesh(geometry, waterMaterial);
-    sea.position.y = -2;
-    sea.receiveShadow = true;
-    terrain.add(sea);
-    extras.push(waterMaterial);
-  }
+    textures = [];
   const particles = [],
     wrecks = [];
   const wreckGeometry = new THREE.BoxGeometry(1, 1, 1),
@@ -130,7 +53,7 @@ export function enhanceEnvironment(scene, terrain, stage, map) {
           : -8
         : 12;
   const spawn = (x, y, z, color, size, life, kind = "smoke", end = null) => {
-    if (particles.length >= 70) return;
+    if (particles.length >= QUALITY[quality].particles) return;
     const material = new THREE.SpriteMaterial({
       map: smokeTexture,
       color,
@@ -156,9 +79,9 @@ export function enhanceEnvironment(scene, terrain, stage, map) {
         ) {
           const wreck = new THREE.Mesh(wreckGeometry, wreckMaterial);
           wreck.position.set(
-            e.x - 500,
+            e.x - halfW,
             stage.terrain === "abyss" ? -17 : 3,
-            e.y - 310,
+            e.y - halfH,
           );
           wreck.scale.set(
             e.size * 1.6,
@@ -171,9 +94,9 @@ export function enhanceEnvironment(scene, terrain, stage, map) {
           if (wrecks.length > 24) scene.remove(wrecks.shift().mesh);
         }
         spawn(
-          e.x - 500,
+          e.x - halfW,
           level(e.domain),
-          e.y - 310,
+          e.y - halfH,
           "#ffae45",
           e.size * 2.7,
           0.6,
@@ -181,15 +104,15 @@ export function enhanceEnvironment(scene, terrain, stage, map) {
         );
         for (let i = 0; i < 5; i++)
           spawn(
-            e.x - 500 + (random() - 0.5) * 15,
+            e.x - halfW + (random() - 0.5) * 15,
             level(e.domain),
-            e.y - 310 + (random() - 0.5) * 15,
+            e.y - halfH + (random() - 0.5) * 15,
             "#494846",
             e.size * 1.8,
             2.5,
           );
       } else if (e.kind === "shot") {
-        const start = { x: e.x - 500, y: level(e.domain), z: e.y - 310 };
+        const start = { x: e.x - halfW, y: level(e.domain), z: e.y - halfH };
         spawn(
           start.x,
           start.y,
@@ -208,7 +131,7 @@ export function enhanceEnvironment(scene, terrain, stage, map) {
             e.type === "soldier" ? 3 : 7,
             0.35,
             "projectile",
-            { x: e.tx - 500, y: level(e.targetDomain), z: e.ty - 310 },
+            { x: e.tx - halfW, y: level(e.targetDomain), z: e.ty - halfH },
           );
       }
     }
@@ -228,35 +151,27 @@ export function enhanceEnvironment(scene, terrain, stage, map) {
             e.team === "blue" &&
             !e.carriedBy &&
             Math.hypot(
-              e.x - (w.mesh.position.x + 500),
-              e.y - (w.mesh.position.z + 310),
-            ) < 200,
+              e.x - (w.mesh.position.x + halfW),
+              e.y - (w.mesh.position.z + halfH),
+            ) < visionRadius(e),
         );
       if (w.life <= 0) {
         scene.remove(w.mesh);
         wrecks.splice(i, 1);
       }
     }
-    if (sea) {
-      const p = sea.geometry.attributes.position;
-      for (let i = 0; i < p.count; i++)
-        p.setY(
-          i,
-          Math.sin(p.getX(i) * 0.027 + battle.time * 0.9) * 1.2 +
-            Math.cos(p.getZ(i) * 0.04 + battle.time * 0.7) * 0.8,
-        );
-      p.needsUpdate = true;
-    }
+    landscape.animate(battle.time);
     if (battle.time - lastTrail > 0.28) {
       lastTrail = battle.time;
       for (const e of battle.entities) {
+        if (e.carriedBy || (battle.isVisible && !battle.isVisible(e))) continue;
         if (!e.speed || (!e.order && e.team === "blue")) continue;
         if (e.domain === "air")
-          spawn(e.x - 500, flightHeight - 1, e.y - 310, "#e0e3df", 8, 1.5);
+          spawn(e.x - halfW, flightHeight - 1, e.y - halfH, "#e0e3df", 8, 1.5);
         else if (e.domain === "sea")
-          spawn(e.x - 500, 0, e.y - 310, "#c9f1ec", 12, 1.3);
+          spawn(e.x - halfW, 0, e.y - halfH, "#c9f1ec", 12, 1.3);
         else if (e.type === "tank")
-          spawn(e.x - 500, 4, e.y - 310, "#b39d80", 9, 0.9);
+          spawn(e.x - halfW, 4, e.y - halfH, "#b39d80", 9, 0.9);
       }
     }
     for (let i = particles.length - 1; i >= 0; i--) {
@@ -284,6 +199,10 @@ export function enhanceEnvironment(scene, terrain, stage, map) {
   return {
     events,
     animate,
+    setQuality(value) {
+      quality = value;
+      landscape.setQuality(value);
+    },
     dispose() {
       for (const wreck of wrecks) scene.remove(wreck.mesh);
       wreckGeometry.dispose();
@@ -293,7 +212,7 @@ export function enhanceEnvironment(scene, terrain, stage, map) {
         p.sprite.material.dispose();
       }
       particles.length = 0;
-      for (const material of extras) material.dispose();
+      landscape.dispose();
       for (const texture of textures) texture.dispose();
     },
   };

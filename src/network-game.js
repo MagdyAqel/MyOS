@@ -18,6 +18,7 @@ export function bindNetworkGame(
     '[aria-label="نوع المهمة"]',
     '[aria-label="مستوى الصعوبة"]',
     "[data-game=restart]",
+    "[data-game=large-map]",
     "[data-game=next]",
     "[data-game=pause]",
     "[data-game=save]",

@@ -1,3 +1,4 @@
+import { mapSize, mapY } from "./world.js";
 import { findRoute, moveUnit, walkable } from "./navigation.js";
 export const FORMATIONS = {
   line: "خط دفاع",
@@ -44,8 +45,8 @@ export function formationPoint(b, index, count, x, y) {
     dy = (Math.floor(index / 4) - Math.floor((count - 1) / 4) / 2) * gap;
   }
   return {
-    x: Math.max(25, Math.min(975, x + dx)),
-    y: Math.max(25, Math.min(595, y + dy)),
+    x: Math.max(25, Math.min(mapSize(b.map).width - 25, x + dx)),
+    y: Math.max(25, Math.min(mapSize(b.map).height - 25, y + dy)),
   };
 }
 export function issueTacticalOrder(b, kind, x, y) {
@@ -76,6 +77,7 @@ export function issueTacticalOrder(b, kind, x, y) {
   }
   units.forEach((e, i) => {
     e.stance = "normal";
+    delete e.attackGoal;
     e.servicing = false;
     delete e.boarding;
     delete e.recon;
@@ -109,12 +111,12 @@ export function validHQDestination(b, hq, x, y) {
     !Number.isFinite(x) ||
     !Number.isFinite(y) ||
     x < 55 ||
-    x > 945 ||
+    x > mapSize(b.map).width - 55 ||
     y < 55 ||
-    y > 565
+    y > mapSize(b.map).height - 55
   )
     return false;
-  if (b.stageIndex === 2 && y > 190) return false;
+  if (b.stageIndex === 2 && y > mapY(b.map, 190)) return false;
   return (
     walkable(b.map, hq, x, y) &&
     !b.entities.some(
@@ -142,7 +144,10 @@ export function relocateHQ(b, x, y) {
   }
   const vehicle = { ...hq, speed: 24 };
   const route = findRoute(b.map, vehicle, hq, { x, y });
-  if (!route.length || (b.stageIndex === 2 && route.some((p) => p.y > 205))) {
+  if (
+    !route.length ||
+    (b.stageIndex === 2 && route.some((p) => p.y > mapY(b.map, 205)))
+  ) {
     b.message = "لا يوجد مسار آمن لنقل مركز القيادة";
     return false;
   }

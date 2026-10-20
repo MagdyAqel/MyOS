@@ -269,3 +269,47 @@
   max-width: 100px;
   font-size: 11px;
 }
+.building-repair {
+  margin: 8px 0 12px;
+  padding: 8px;
+  border: 1px solid #49666e;
+  border-radius: 7px;
+  background: #132c33;
+}
+.building-repair summary {
+  cursor: pointer;
+  color: #d9d7af;
+  padding: 5px 0;
+  font-size: 12px;
+}
+.building-repair label,
+.building-repair small {
+  display: block;
+  font-size: 11px;
+  line-height: 1.7;
+}
+.building-repair select {
+  width: 100%;
+  min-height: 40px;
+  margin-top: 6px;
+  color: #ecf1e5;
+  background: #213b43;
+  border: 1px solid #61777a;
+  border-radius: 4px;
+}
+.building-repair button {
+  width: 100%;
+  min-height: 40px;
+  margin-bottom: 8px;
+}
+.building-repair .repair-status {
+  font-size: 11px;
+  color: #b9d1c5;
+}
+@media (pointer: coarse) {
+  .building-repair select,
+  .building-repair button {
+    min-height: 44px;
+    font-size: 16px;
+  }
+}

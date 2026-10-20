@@ -1,3 +1,4 @@
+import { mapX, mapY, mapPoint, mapGrid } from "./world.js";
 import { blocked } from "./maps.js";
 import { moveUnit } from "./navigation.js";
 import { visionRadius } from "./unit-abilities.js";
@@ -99,20 +100,22 @@ export function initializeSystems(b, options = {}) {
     cash: options.startingCash === b.startingCash ? b.startingCash : 1200,
     nextDecision: 12,
     nextOrders: 8,
-    lastHQ: { x: 130, y: b.stageIndex === 2 ? 140 : 320 },
+    lastHQ: mapPoint(b.map, 130, b.stageIndex === 2 ? 140 : 320),
   };
   b.explored = new Set();
   b.nextExplore = 0;
   b.fog = options.fog !== false;
-  if (b.mission.id === "escort") b.add("convoy", "blue", 140, 540);
+  if (b.mission.id === "escort")
+    b.add("convoy", "blue", mapX(b.map, 140), mapY(b.map, 540));
   if (b.mission.id === "rescue")
     for (const [x, y] of [
       [680, 440],
       [735, 490],
       [780, 460],
     ])
-      b.add("survivor", "neutral", x, y);
-  if (b.mission.id === "capture") b.add("outpost", "neutral", 640, 230);
+      b.add("survivor", "neutral", mapX(b.map, x), mapY(b.map, y));
+  if (b.mission.id === "capture")
+    b.add("outpost", "neutral", mapX(b.map, 640), mapY(b.map, 230));
   updateExploration(b);
 }
 export function visibleTo(b, entity, team = "blue") {
@@ -129,30 +132,32 @@ export function visibleTo(b, entity, team = "blue") {
 export function updateExploration(b) {
   if (b.time < b.nextExplore) return;
   b.nextExplore = b.time + 0.6;
+  const { cols, rows } = mapGrid(b.map);
   for (const e of b.entities.filter((e) => e.team === "blue")) {
     const radius = visionRadius(e);
     for (
       let y = Math.max(0, Math.floor((e.y - radius) / 25));
-      y < Math.min(25, Math.ceil((e.y + radius) / 25));
+      y < Math.min(rows, Math.ceil((e.y + radius) / 25));
       y++
     )
       for (
         let x = Math.max(0, Math.floor((e.x - radius) / 25));
-        x < Math.min(40, Math.ceil((e.x + radius) / 25));
+        x < Math.min(cols, Math.ceil((e.x + radius) / 25));
         x++
       )
         if (Math.hypot(x * 25 + 12.5 - e.x, y * 25 + 12.5 - e.y) < radius)
-          b.explored.add(y * 40 + x);
+          b.explored.add(y * cols + x);
   }
 }
 function site(b, type, types) {
   const spec = types[type];
-  for (const y of b.stageIndex >= 2
+  for (const rawY of b.stageIndex >= 2
     ? type === "harbor"
       ? [240]
       : [70, 165]
     : [80, 520, 150, 450])
-    for (const x of [920, 790, 700])
+    for (const rawX of [920, 790, 700]) {
+      const { x, y } = mapPoint(b.map, rawX, rawY);
       if (
         !blocked(b.map, x, y, spec.radius + 8) &&
         !b.entities.some(
@@ -161,6 +166,7 @@ function site(b, type, types) {
         )
       )
         return { x, y };
+    }
   return null;
 }
 export function updateEnemy(b, types) {
@@ -247,19 +253,17 @@ export function updateEnemy(b, types) {
         ) ||
         enemies.find((e) => unit.targets.includes(e.domain));
       if (!target) {
-        const destination = enemy.lastHQ || {
-          x: 130,
-          y: b.stageIndex === 2 ? 140 : 320,
-        };
+        const destination =
+          enemy.lastHQ || mapPoint(b.map, 130, b.stageIndex === 2 ? 140 : 320);
         unit.order = b.constrain(unit, destination.x, destination.y);
         unit.route = null;
         continue;
       }
-      if (role === 1 && unit.x > 620) {
+      if (role === 1 && unit.x > mapX(b.map, 620)) {
         unit.order = b.constrain(
           unit,
-          590,
-          b.stageIndex >= 2 ? 550 : unit.id % 2 ? 80 : 550,
+          mapX(b.map, 590),
+          mapY(b.map, b.stageIndex >= 2 ? 550 : unit.id % 2 ? 80 : 550),
         );
       } else unit.order = { target: target.id };
       unit.route = null;
@@ -279,6 +283,7 @@ export function serviceUnit(b, unit) {
   const base = bases.sort((a, c) => distance(unit, a) - distance(unit, c))[0];
   if (!base) return;
   unit.stance = "normal";
+  delete unit.attackGoal;
   unit.servicing = true;
   unit.tactical = null;
   unit.order = b.constrain(unit, base.x, base.y);
@@ -331,13 +336,13 @@ export function advanceMission(b, dt) {
         e.team === "blue" &&
         e.type === "recon" &&
         e.hp > 0 &&
-        distance(e, { x: 820, y: 470 }) < 100,
+        distance(e, mapPoint(b.map, 820, 470)) < 100,
     )
   )
     b.objective.hold += dt;
   if (b.mission.id === "escort") {
     const convoy = b.entities.find((e) => e.type === "convoy" && e.hp > 0);
-    if (convoy) moveUnit(convoy, { x: 850, y: 540 }, b.map, dt);
+    if (convoy) moveUnit(convoy, mapPoint(b.map, 850, 540), b.map, dt);
   }
   if (b.mission.id === "rescue") {
     const hq = b.entities.find((e) => e.team === "blue" && e.type === "hq");
@@ -384,7 +389,7 @@ export function missionOutcome(b) {
   if (b.mission.id === "recon") return b.objective.hold >= 10 ? "won" : null;
   if (b.mission.id === "escort") {
     const convoy = b.entities.find((e) => e.type === "convoy");
-    return !convoy ? "lost" : convoy.x > 830 ? "won" : null;
+    return !convoy ? "lost" : convoy.x > mapX(b.map, 830) ? "won" : null;
   }
   if (b.mission.id === "rescue")
     return b.objective.evacuated >= 3

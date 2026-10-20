@@ -1,4 +1,6 @@
+import { mapX, mapY, mapGrid } from "../src/world.js";
 import { advancedOrder, startingMoney } from "../src/battle-expansion.js";
+import { attackHeadquarters, repairBuilding } from "../src/battle-orders.js";
 import { Battle } from "../src/battle.js";
 import { snapshotBattle, restoreBattle } from "../src/battle-save.js";
 import { MAPS } from "../src/maps.js";
@@ -27,7 +29,7 @@ export class RoomCore {
     const b = this.battle;
     b.entities = b.entities.filter((e) => e.team === "blue");
     for (const unit of [...b.entities])
-      b.add(unit.type, "red", 1000 - unit.x, unit.y);
+      b.add(unit.type, "red", b.width - unit.x, unit.y);
     b.enemy.cash = b.cash;
     b.multiplayer = true;
     b.paused = true;
@@ -83,6 +85,8 @@ export class RoomCore {
         "hold",
         "retreat",
         "priority",
+        "attackHQ",
+        "repairBuilding",
       ].includes(action.kind)
     )
       throw Error("أمر غير مسموح");
@@ -91,9 +95,9 @@ export class RoomCore {
       (!Number.isFinite(action.x) ||
         !Number.isFinite(action.y) ||
         action.x < 0 ||
-        action.x > 1000 ||
+        action.x > b.width ||
         action.y < 0 ||
-        action.y > 620)
+        action.y > b.height)
     )
       throw Error("وجهة غير صالحة");
     if (
@@ -154,12 +158,20 @@ export class RoomCore {
           outer: for (const y of ys)
             for (const rawX of [320, 440, 240, 510, 90])
               if (
-                b.purchase(action.unit, team === "red" ? 1000 - rawX : rawX, y)
+                b.purchase(
+                  action.unit,
+                  mapX(b.map, team === "red" ? 1000 - rawX : rawX),
+                  mapY(b.map, y),
+                )
               ) {
                 ok = true;
                 break outer;
               }
         }
+      } else if (action.kind === "attackHQ") {
+        ok = attackHeadquarters(b);
+      } else if (action.kind === "repairBuilding") {
+        ok = repairBuilding(b, action.building);
       } else if (["hold", "retreat", "priority"].includes(action.kind)) {
         ok = advancedOrder(b, action);
       } else if (["board", "unload", "recon"].includes(action.kind)) {
@@ -173,8 +185,8 @@ export class RoomCore {
       else if (action.kind === "suggestHQ") ok = suggestedHQDestination(b);
       else if (action.kind === "rally") {
         own.rally = {
-          x: Math.max(25, Math.min(975, action.x)),
-          y: Math.max(25, Math.min(595, action.y)),
+          x: Math.max(25, Math.min(b.width - 25, action.x)),
+          y: Math.max(25, Math.min(b.height - 25, action.y)),
         };
         b.message = "تغيرت نقطة تجمع جيشك";
       } else if (action.kind === "depth") {
@@ -195,20 +207,21 @@ export class RoomCore {
   tick(dt) {
     this.battle.update(dt);
     const b = this.battle;
+    const { cols, rows } = mapGrid(b.map);
     for (const e of b.entities.filter((e) => e.team === "red")) {
       const r = visionRadius(e);
       for (
         let y = Math.max(0, Math.floor((e.y - r) / 25));
-        y < Math.min(25, Math.ceil((e.y + r) / 25));
+        y < Math.min(rows, Math.ceil((e.y + r) / 25));
         y++
       )
         for (
           let x = Math.max(0, Math.floor((e.x - r) / 25));
-          x < Math.min(40, Math.ceil((e.x + r) / 25));
+          x < Math.min(cols, Math.ceil((e.x + r) / 25));
           x++
         )
           if (Math.hypot(x * 25 + 12.5 - e.x, y * 25 + 12.5 - e.y) < r)
-            this.redExplored.add(y * 40 + x);
+            this.redExplored.add(y * cols + x);
     }
   }
   view(team) {

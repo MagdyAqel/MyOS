@@ -1,4 +1,7 @@
+import { mapX, mapY } from "./world.js";
 import { setupBattleOptions, PerformanceGovernor } from "./battle-options.js";
+import { setupBuildingRepairs } from "./building-controls.js";
+import { attackHeadquarters } from "./battle-orders.js";
 import "./expansion.css";
 import { bindNetworkGame } from "./network-game.js";
 import { setupCommandCenter } from "./command-center.js";
@@ -7,7 +10,7 @@ import { specialAction } from "./unit-abilities.js";
 import { Battle, TYPES } from "./battle.js";
 import { STAGES, FORCE_PHASES, loadCampaign } from "./campaign.js";
 import { createBattleScene } from "./scene3d.js";
-import { MAPS, mapSvg } from "./maps.js";
+import { MAPS, LARGE_MAP_IDS, mapSvg } from "./maps.js";
 import { BattleAudio } from "./audio.js";
 import "./realism.css";
 import "./apps.css";
@@ -49,7 +52,7 @@ export function setupGame(content, { network = null } = {}) {
   }
   content.innerHTML = `<div class="rts-app">
     <header class="rts-header"><div><span class="eyebrow">COMMAND HORIZON · 3D</span><strong>قيادة الأفق</strong></div><div class="rts-stats" aria-live="off"><span data-stat="cash"></span><span data-stat="wave"></span><span data-stat="army"></span></div><div class="sound-controls"><button data-sound="toggle" aria-pressed="false">تشغيل الأصوات</button><label>الصوت <input type="range" min="0" max="100" aria-label="مستوى صوت اللعبة" value="${Math.round(audio.volume * 100)}"></label></div><button data-game="pause">إيقاف مؤقت</button><button data-game="restart">إعادة المرحلة</button></header>
-    <div class="campaign-bar" id="game-maps"><label>بيئة التدريب <select aria-label="اختيار المرحلة">${STAGES.map((s, i) => `<option value="${i}">${i + 1}. ${s.name} — ${s.category}</option>`).join("")}</select></label><label>الخريطة <select aria-label="اختيار الخريطة"></select></label><label>المهمة <select aria-label="نوع المهمة"></select></label><label>الصعوبة <select aria-label="مستوى الصعوبة">${Object.entries(
+    <div class="campaign-bar" id="game-maps"><label>بيئة التدريب <select aria-label="اختيار المرحلة">${STAGES.map((s, i) => `<option value="${i}">${i + 1}. ${s.name} — ${s.category}</option>`).join("")}</select></label><label>الخريطة <select aria-label="اختيار الخريطة"></select></label><button data-game="large-map">بدء معركة واسعة</button><label>المهمة <select aria-label="نوع المهمة"></select></label><label>الصعوبة <select aria-label="مستوى الصعوبة">${Object.entries(
       DIFFICULTIES,
     )
       .map(
@@ -157,10 +160,11 @@ export function setupGame(content, { network = null } = {}) {
       );
     }
   }
-  let networkUI, extraUI;
+  let networkUI, extraUI, repairUI;
   let unitUI,
     tacticalUI,
     orderIntent = null,
+    automaticQuality = "low",
     qualityChoice = "auto";
   try {
     qualityChoice = storage.getItem("myos-quality-v1") || "auto";
@@ -315,6 +319,7 @@ export function setupGame(content, { network = null } = {}) {
       saveProgress();
     }
     unitUI?.refresh();
+    repairUI?.refresh();
     networkUI?.hud();
   }
   function start(index, mapId = chosenMaps[index], restored = null, run = {}) {
@@ -346,6 +351,8 @@ export function setupGame(content, { network = null } = {}) {
       .map((m) => `<option value="${m.id}">${m.name}</option>`)
       .join("");
     mapSelect.value = battle.map.id;
+    content.querySelector("[data-game=large-map]").disabled =
+      Boolean(network) || battle.width > 1000;
     content.querySelector(".map-preview").innerHTML =
       mapSvg(battle.map) +
       `<strong>${battle.map.name}</strong><p>${battle.map.description}</p>`;
@@ -399,7 +406,11 @@ export function setupGame(content, { network = null } = {}) {
     );
     try {
       view = createBattleScene(canvas, battle.stage, battle.map, {
-        quality: extraUI?.preferences.battery ? "low" : qualityChoice,
+        quality: extraUI?.preferences.battery
+          ? "low"
+          : qualityChoice === "auto"
+            ? automaticQuality
+            : qualityChoice,
       });
       view.draw(battle);
       canvas.dataset.renderer = "webgl";
@@ -474,17 +485,26 @@ export function setupGame(content, { network = null } = {}) {
     content.querySelector('[aria-label="مستوى الصوت للجوال"]').value =
       event.target.value;
   };
+  content.querySelector("[data-game=large-map]").onclick = () => {
+    if (network) return;
+    start(battle.stageIndex, LARGE_MAP_IDS[battle.stageIndex], null, {
+      startingCash: battle.startingCash,
+    });
+  };
   minimap.onclick = (event) => {
     if (!view) return;
-    const rect = minimap.querySelector("svg").getBoundingClientRect(),
-      x = ((event.clientX - rect.left) / rect.width) * 1000,
-      y = ((event.clientY - rect.top) / rect.height) * 620;
+    const svg = minimap.querySelector("svg");
+    const matrix = svg.getScreenCTM();
+    if (!matrix) return;
+    const { x, y } = new DOMPoint(event.clientX, event.clientY).matrixTransform(
+      matrix.inverse(),
+    );
     if (event.shiftKey && orderIntent === "recon") {
       if (
         specialAction(battle, {
           kind: "recon",
-          x: Math.max(20, Math.min(980, x)),
-          y: Math.max(20, Math.min(595, y)),
+          x: Math.max(20, Math.min(battle.width - 20, x)),
+          y: Math.max(20, Math.min(battle.height - 25, y)),
         })
       )
         orderIntent = null;
@@ -540,25 +560,8 @@ export function setupGame(content, { network = null } = {}) {
   };
   content.querySelector('[data-game="attack"]').onclick = () => {
     building = null;
-    const hq = battle.entities.find((e) => e.type === "hq" && e.team === "red");
-    if (!hq && network) {
-      battle.message = "استكشف موقع مقر الخصم قبل الهجوم عليه";
-      refresh();
-      return;
-    }
-    if (hq) {
-      battle.commandMode = "move";
-      battle.command(hq.x, hq.y);
-      if (
-        !network &&
-        !battle.isVisible(hq) &&
-        battle.selected.size &&
-        !battle.paused &&
-        battle.status === "playing"
-      )
-        battle.message =
-          "أمر هجوم: تتقدم الوحدات لاستكشاف موضع القيادة قبل الاشتباك";
-    }
+    orderIntent = null;
+    attackHeadquarters(battle);
     refresh();
   };
   content.querySelector('[data-game="autoplace"]').onclick = () => {
@@ -577,7 +580,9 @@ export function setupGame(content, { network = null } = {}) {
           : [150, 450, 75, 530, 240];
     for (const y of ys)
       for (const x of [320, 440, 240, 510, 90])
-        if (battle.purchase(building, x, y)) {
+        if (
+          battle.purchase(building, mapX(battle.map, x), mapY(battle.map, y))
+        ) {
           building = null;
           refresh();
           return;
@@ -758,8 +763,8 @@ export function setupGame(content, { network = null } = {}) {
       if (
         specialAction(battle, {
           kind: "recon",
-          x: Math.max(20, Math.min(980, point.x)),
-          y: Math.max(20, Math.min(595, point.y)),
+          x: Math.max(20, Math.min(battle.width - 20, point.x)),
+          y: Math.max(20, Math.min(battle.height - 25, point.y)),
         })
       )
         orderIntent = null;
@@ -774,8 +779,8 @@ export function setupGame(content, { network = null } = {}) {
         return;
       }
       battle.rally = {
-        x: Math.max(25, Math.min(975, point.x)),
-        y: Math.max(25, Math.min(595, point.y)),
+        x: Math.max(25, Math.min(battle.width - 25, point.x)),
+        y: Math.max(25, Math.min(battle.height - 25, point.y)),
       };
       orderIntent = null;
       battle.message =
@@ -792,7 +797,13 @@ export function setupGame(content, { network = null } = {}) {
       if (battle.purchase(building, point.x, point.y)) building = null;
     } else {
       const entity = battle.entities.find((e) => e.id === point.entityId);
-      if (event.button !== 2 && entity?.team === "blue" && entity.speed) {
+      if (event.button !== 2 && entity?.team === "blue" && !entity.speed) {
+        repairUI.inspect(entity.id);
+      } else if (
+        event.button !== 2 &&
+        entity?.team === "blue" &&
+        entity.speed
+      ) {
         if (!event.shiftKey && !multiSelect) battle.selected.clear();
         if (multiSelect && battle.selected.has(entity.id))
           battle.selected.delete(entity.id);
@@ -826,6 +837,7 @@ export function setupGame(content, { network = null } = {}) {
     if (last && qualityChoice === "auto" && !extraUI?.preferences.battery) {
       const next = governor.sample(time - last, time);
       if (next) {
+        automaticQuality = next;
         view?.setQuality(next);
         extraUI?.performance(
           `الجودة التلقائية: ${next === "low" ? "اقتصادية" : "متوازنة"} بحسب معدل الإطارات`,
@@ -883,6 +895,7 @@ export function setupGame(content, { network = null } = {}) {
       building = null;
     },
   });
+  repairUI = setupBuildingRepairs(content, () => battle, refresh);
   extraUI = setupBattleOptions(content, {
     getBattle: () => battle,
     start,
@@ -890,7 +903,13 @@ export function setupGame(content, { network = null } = {}) {
     audio,
     storage,
     onPerformanceChange: (battery) =>
-      view?.setQuality(battery ? "low" : qualityChoice),
+      view?.setQuality(
+        battery
+          ? "low"
+          : qualityChoice === "auto"
+            ? automaticQuality
+            : qualityChoice,
+      ),
   });
   content.addEventListener("myos:briefing", (event) =>
     extraUI.briefing(event.detail),
@@ -939,7 +958,9 @@ export function setupGame(content, { network = null } = {}) {
     : "auto";
   qualitySelect.onchange = () => {
     qualityChoice = qualitySelect.value;
-    view?.setQuality(qualityChoice);
+    view?.setQuality(
+      qualityChoice === "auto" ? automaticQuality : qualityChoice,
+    );
     try {
       storage.setItem("myos-quality-v1", qualityChoice);
     } catch {

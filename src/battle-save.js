@@ -1,3 +1,4 @@
+import { mapSize, mapGrid, mapPoint } from "./world.js";
 import {
   checkTactics,
   snapshotTactics,
@@ -77,6 +78,9 @@ export function restoreBattle(raw) {
     !["playing", "won", "lost"].includes(data.status)
   )
     throw Error("ملف المعركة غير متوافق");
+  const map = mapFor(data.stage, data.map);
+  const { width, height } = mapSize(map);
+  const { cols, rows } = mapGrid(map);
   for (const key of [
     "time",
     "cash",
@@ -95,7 +99,7 @@ export function restoreBattle(raw) {
     !Array.isArray(data.selected) ||
     data.selected.length > 60 ||
     !Array.isArray(data.explored) ||
-    data.explored.length > 1000
+    data.explored.length > cols * rows
   )
     throw Error("قائمة وحدات غير صالحة");
   if (
@@ -120,8 +124,8 @@ export function restoreBattle(raw) {
       e.id < 1 ||
       e.id > 1e6 ||
       ids.has(e.id) ||
-      !number(e.x, 1000) ||
-      !number(e.y, 620) ||
+      !number(e.x, width) ||
+      !number(e.y, height) ||
       !number(
         e.hp,
         Math.round(
@@ -141,12 +145,14 @@ export function restoreBattle(raw) {
     if (
       e.order &&
       !(Number.isInteger(e.order.target) && e.order.target > 0) &&
-      !(number(e.order.x, 1000) && number(e.order.y, 620))
+      !(number(e.order.x, width) && number(e.order.y, height))
     )
       throw Error("أمر محفوظ غير صالح");
     ids.add(e.id);
   }
-  if (data.explored.some((n) => !Number.isInteger(n) || n < 0 || n >= 1000))
+  if (
+    data.explored.some((n) => !Number.isInteger(n) || n < 0 || n >= cols * rows)
+  )
     throw Error("بيانات رؤية غير صالحة");
   for (const e of data.entities) {
     for (const key of ["carriedBy", "boarding"])
@@ -171,8 +177,8 @@ export function restoreBattle(raw) {
     if (
       e.recon &&
       (e.type !== "recon" ||
-        !number(e.recon.x, 1000) ||
-        !number(e.recon.y, 620))
+        !number(e.recon.x, width) ||
+        !number(e.recon.y, height))
     )
       throw Error("منطقة استطلاع غير صالحة");
   }
@@ -184,8 +190,8 @@ export function restoreBattle(raw) {
         (s) =>
           !s ||
           !["blue", "red"].includes(s.team) ||
-          !["x", "tx"].every((k) => number(s[k], 1000)) ||
-          !["y", "ty"].every((k) => number(s[k], 620)) ||
+          !["x", "tx"].every((k) => number(s[k], width)) ||
+          !["y", "ty"].every((k) => number(s[k], height)) ||
           !number(s.damage, 500) ||
           !number(s.duration, 5) ||
           s.duration <= 0 ||
@@ -208,7 +214,7 @@ export function restoreBattle(raw) {
     if (e.carriedBy !== undefined) entity.carriedBy = e.carriedBy;
     if (e.boarding !== undefined) entity.boarding = e.boarding;
     if (e.recon) entity.recon = { x: e.recon.x, y: e.recon.y };
-    restoreUnitTactics(entity, e);
+    restoreUnitTactics(entity, e, map);
     entity.id = e.id;
     entity.hp = e.hp;
     entity.ammo = Math.min(entity.maxAmmo, e.ammo);
@@ -220,7 +226,7 @@ export function restoreBattle(raw) {
     entity.order = e.order
       ? e.order.target && ids.has(e.order.target)
         ? { target: e.order.target }
-        : number(e.order.x, 1000) && number(e.order.y, 620)
+        : number(e.order.x, width) && number(e.order.y, height)
           ? { x: e.order.x, y: e.order.y }
           : null
       : null;
@@ -243,10 +249,10 @@ export function restoreBattle(raw) {
     nextOrders: data.enemy.nextOrders,
     lastHQ:
       data.enemy.lastHQ &&
-      number(data.enemy.lastHQ.x, 1000) &&
-      number(data.enemy.lastHQ.y, 620)
+      number(data.enemy.lastHQ.x, width) &&
+      number(data.enemy.lastHQ.y, height)
         ? { x: data.enemy.lastHQ.x, y: data.enemy.lastHQ.y }
-        : { x: 130, y: data.stage === 2 ? 140 : 320 },
+        : mapPoint(map, 130, data.stage === 2 ? 140 : 320),
   };
   b.objective = {
     hold: data.objective.hold,

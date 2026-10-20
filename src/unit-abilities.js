@@ -1,3 +1,4 @@
+import { mapSize } from "./world.js";
 import { moveUnit, walkable } from "./navigation.js";
 
 export const APC_DESIGNS = {
@@ -55,7 +56,7 @@ export const SPECIAL_TYPES = {
     hp: 90,
     radius: 12,
     speed: 110,
-    damage: 280,
+    damage: 600,
     range: 16,
     cooldown: 1,
     needs: "airfield",
@@ -135,6 +136,7 @@ export function specialAction(b, action) {
       soldier.order = null;
       soldier.route = null;
       soldier.tactical = null;
+      delete soldier.attackGoal;
       soldier.servicing = false;
       count++;
     }
@@ -193,9 +195,9 @@ export function specialAction(b, action) {
       !Number.isFinite(action.x) ||
       !Number.isFinite(action.y) ||
       action.x < 20 ||
-      action.x > 980 ||
+      action.x > mapSize(b.map).width - 20 ||
       action.y < 20 ||
-      action.y > 595
+      action.y > mapSize(b.map).height - 25
     )
       return false;
     let count = 0;
@@ -203,6 +205,7 @@ export function specialAction(b, action) {
       plane.recon = { x: action.x, y: action.y };
       plane.order = b.constrain(plane, action.x, action.y);
       plane.tactical = null;
+      delete plane.attackGoal;
       plane.route = null;
       plane.servicing = false;
       count++;

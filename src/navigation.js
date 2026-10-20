@@ -1,18 +1,24 @@
+import { mapSize, mapY, mapGrid } from "./world.js";
 import { blocked } from "./maps.js";
-const CELL = 25,
-  COLS = 40,
-  ROWS = 25;
+const CELL = 25;
 export function walkable(map, unit, x, y) {
-  if (x < 15 || x > 985 || y < 15 || y > 605) return false;
+  const { width, height } = mapSize(map);
+  if (x < 15 || x > width - 15 || y < 15 || y > height - 15) return false;
   if (unit.domain === "air") return true;
-  if (map.stage === 2 && unit.domain === "ground" && y > 235) return false;
-  if (map.stage === 2 && ["sea", "sub"].includes(unit.domain) && y < 285)
+  if (map.stage === 2 && unit.domain === "ground" && y > mapY(map, 235))
+    return false;
+  if (
+    map.stage === 2 &&
+    ["sea", "sub"].includes(unit.domain) &&
+    y < mapY(map, 285)
+  )
     return false;
   return !blocked(map, x, y, unit.radius + 3);
 }
 // A small deterministic grid route. Aircraft bypass terrain; sea units stay in water.
 export function findRoute(map, unit, start, end) {
   if (unit.domain === "air") return [{ ...end }];
+  const { cols: COLS, rows: ROWS } = mapGrid(map);
   const point = (i) => ({
     x: (i % COLS) * CELL + CELL / 2,
     y: Math.floor(i / COLS) * CELL + CELL / 2,

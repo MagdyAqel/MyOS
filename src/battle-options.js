@@ -1,24 +1,7 @@
 import { COMPACT_QUERY } from "./mobile.js";
 import { SECONDARY_GOALS } from "./career.js";
 import { advancedOrder, selectInRectangle } from "./battle-expansion.js";
-export class PerformanceGovernor {
-  constructor() {
-    this.samples = [];
-    this.since = 0;
-    this.quality = "medium";
-  }
-  sample(milliseconds, now) {
-    if (milliseconds > 0 && milliseconds < 250) this.samples.push(milliseconds);
-    if (this.samples.length > 180) this.samples.shift();
-    if (now - this.since < 8000 || this.samples.length < 90) return null;
-    this.since = now;
-    const mean = this.samples.reduce((a, b) => a + b, 0) / this.samples.length;
-    const next = mean > 30 ? "low" : mean < 19 ? "medium" : this.quality;
-    this.samples = [];
-    if (next === this.quality) return null;
-    return (this.quality = next);
-  }
-}
+export { PerformanceGovernor } from "./render-performance.js";
 export function setupBattleOptions(
   content,
   { getBattle, start, refresh, audio, storage, onPerformanceChange },

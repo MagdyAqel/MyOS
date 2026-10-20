@@ -117,7 +117,7 @@ test("room API rejects unapproved web origins", async ({ request }) => {
   expect(response.status()).toBe(403);
 });
 
-test("custom funds, commander names, countdown, RTT, surrender and mutual rematch work across two browsers", async ({
+test("large-map rooms, custom funds, countdown, surrender, rematch and army attacks work across two browsers", async ({
   browser,
 }) => {
   const a = await browser.newContext(),
@@ -132,6 +132,9 @@ test("custom funds, commander names, countdown, RTT, surrender and mutual rematc
     await host
       .getByRole("spinbutton", { name: "مال بداية المواجهة", exact: true })
       .fill("15000");
+    await host
+      .getByLabel("خريطة المواجهة", { exact: true })
+      .selectOption("great-divide");
     await host.locator("[data-arena=create]").click();
     await expect(host.locator(".arena-qr svg")).toBeVisible();
     const invitation = await host
@@ -160,13 +163,17 @@ test("custom funds, commander names, countdown, RTT, surrender and mutual rematc
       await page.locator("[data-arena=play]").click();
       await expect(page.locator("[data-stat=cash]")).toHaveText("$15000");
       await expect(page.locator("[data-game=configure]")).toBeDisabled();
+      await expect(page.locator(".battle-minimap svg")).toHaveAttribute(
+        "viewBox",
+        "0 0 1600 1000",
+      );
     }
     const bounds = await host.locator(".game-window").boundingBox();
     expect(bounds.x).toBe(0);
     expect(bounds.y).toBe(0);
     expect(bounds.width).toBe(1280);
 
-    await host.screenshot({ path: "/tmp/MyOS-4.2-online.png" });
+    await host.screenshot({ path: "/tmp/MyOS-4.3-online.png" });
     expect(
       await guest.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,
@@ -175,7 +182,7 @@ test("custom funds, commander names, countdown, RTT, surrender and mutual rematc
     expect(
       (await guest.locator("canvas").boundingBox()).height,
     ).toBeGreaterThan(250);
-    await guest.screenshot({ path: "/tmp/MyOS-4.2-mobile.png" });
+    await guest.screenshot({ path: "/tmp/MyOS-4.3-mobile.png" });
     await guest.locator("[data-online=surrender]").click();
     await expect(host.locator(".rts-result")).toContainText("انتصار");
     await expect(guest.locator(".rts-result")).toContainText("انتهت المهمة");
@@ -192,6 +199,26 @@ test("custom funds, commander names, countdown, RTT, surrender and mutual rematc
     for (const page of [host, guest]) {
       await expect(page.locator("[data-stat=cash]")).toHaveText("$15000");
       await expect(page.locator("[data-stat=army]")).toContainText("المحدد 0");
+    }
+    // A hidden enemy HQ must not turn the quick-attack button into a no-op.
+    for (const [page, direction] of [
+      [host, 1],
+      [guest, -1],
+    ]) {
+      const troop = page
+        .locator('.battle-minimap circle[r="9"][fill="#5dd6ff"]')
+        .first();
+      const before = Number(await troop.getAttribute("cx"));
+      await page.locator("[data-game=select]").click();
+      await page.locator("[data-game=attack]").click();
+      await expect(page.locator(".rts-message")).toContainText("أمر هجوم");
+      await expect
+        .poll(
+          async () =>
+            direction * (Number(await troop.getAttribute("cx")) - before),
+          { timeout: 10000 },
+        )
+        .toBeGreaterThan(10);
     }
   } finally {
     await a.close();

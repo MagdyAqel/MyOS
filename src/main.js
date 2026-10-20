@@ -97,7 +97,7 @@ function openApp(id,matchConnection=null,openTarget=null){
   if(id==='files') w.cleanup=setupFiles(content,{target:openTarget,openMedia:item=>openApp('media',null,item)});
   if(id==='settings'){w.cleanup=setupPersonalization(content,wallpaperManager,setTheme);setupAppearance(content);}
   if(['files','notes'].includes(id))content.dataset.appReady='true';
-  if(id==='about')content.innerHTML='<div class="about-page"><span class="about-mark">◈</span><h2>MyOS</h2><p>سطح مكتب صغير. احتمالات كبيرة.</p><p class="muted">محاكاة تفاعلية مستوحاة من ويندوز 11 تعمل داخل المتصفح.<br>ليست نظام تشغيل حقيقيًا، ولا تشغّل برامج Windows.</p><span class="version">الإصدار 4.2.0 · Develped by:Pro. Magdy S. Aqel</span></div>';
+  if(id==='about')content.innerHTML='<div class="about-page"><span class="about-mark">◈</span><h2>MyOS</h2><p>سطح مكتب صغير. احتمالات كبيرة.</p><p class="muted">محاكاة تفاعلية مستوحاة من ويندوز 11 تعمل داخل المتصفح.<br>ليست نظام تشغيل حقيقيًا، ولا تشغّل برامج Windows.</p><span class="version">الإصدار 4.3.0 · Develped by:Pro. Magdy S. Aqel</span></div>';
 }
 setupGlobalSearch(item=>openApp(item.app,null,item));
 const wallpaperManager=createWallpaperManager();

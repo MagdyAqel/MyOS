@@ -1,8 +1,14 @@
+import { mapSize } from "./world.js";
+import { mapFor } from "./maps.js";
 import { FORMATIONS, normalizeUpgrades } from "./tactics.js";
 import { OPERATIONS } from "./career.js";
 const finite = (n, max = 1000) => Number.isFinite(n) && n >= 0 && n <= max;
-const point = (p) => p && finite(p.x) && finite(p.y, 620);
+const pointCheck = (map) => {
+  const { width, height } = mapSize(map);
+  return (p) => p && finite(p.x, width) && finite(p.y, height);
+};
 export function checkTactics(data) {
+  const point = pointCheck(mapFor(data.stage, data.map));
   if (
     data.equipment &&
     (typeof data.equipment !== "object" ||
@@ -81,6 +87,9 @@ export function snapshotTactics(b) {
 }
 export function snapshotUnitTactics(e) {
   return {
+    attackGoal: e.attackGoal,
+    repairing: e.repairing,
+    repairTimer: e.repairTimer,
     stance: e.stance,
     priority: e.priority,
     velocity: e.velocity,
@@ -93,7 +102,23 @@ export function snapshotUnitTactics(e) {
     tactical: e.tactical,
   };
 }
-export function restoreUnitTactics(e, saved) {
+export function restoreUnitTactics(e, saved, map) {
+  const point = pointCheck(map);
+  if (saved.attackGoal !== undefined) {
+    if (!e.speed || !point(saved.attackGoal))
+      throw Error("وجهة هجوم غير صالحة");
+    e.attackGoal = { x: saved.attackGoal.x, y: saved.attackGoal.y };
+  }
+  if (saved.repairing !== undefined || saved.repairTimer !== undefined) {
+    if (
+      e.speed ||
+      typeof saved.repairing !== "boolean" ||
+      !finite(saved.repairTimer ?? 0, 1.1)
+    )
+      throw Error("حالة تصليح غير صالحة");
+    e.repairing = saved.repairing;
+    e.repairTimer = saved.repairTimer || 0;
+  }
   for (const [key, allowed] of [
     ["stance", ["normal", "hold", "attackMove", "retreat"]],
     ["priority", ["nearest", "air", "armor"]],
