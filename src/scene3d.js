@@ -53,6 +53,7 @@ export function createBattleScene(
   controls.target.set(0, 0, 0);
   controls.enableDamping = true;
   controls.enablePan = false;
+  controls.zoomToCursor = true;
   controls.minDistance = 260;
   controls.maxDistance = Math.max(1600, width * 1.5);
   controls.maxPolarAngle = Math.PI / 2.7;

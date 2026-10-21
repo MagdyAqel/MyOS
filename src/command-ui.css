@@ -45,6 +45,28 @@
   font-size: 11px;
   backdrop-filter: blur(8px);
 }
+.game-window .field-pan {
+  position: absolute;
+  top: 51px;
+  left: 12px;
+  z-index: 5;
+  min-height: 36px;
+  padding: 7px 12px;
+  background: #102b3de8;
+  font-size: 11px;
+  backdrop-filter: blur(8px);
+}
+.game-window .rts-app.pan-mode .battlefield canvas {
+  cursor: grab;
+}
+.game-window .rts-app.pan-dragging .battlefield canvas {
+  cursor: grabbing;
+}
+@media (pointer: coarse) and (hover: none) {
+  .game-window .field-pan {
+    display: none;
+  }
+}
 .game-window .scene-badge {
   display: none;
 }

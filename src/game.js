@@ -62,7 +62,7 @@ export function setupGame(content, { network = null } = {}) {
       .join(
         "",
       )}</select></label><div class="save-controls"><button data-game="save">حفظ المعركة</button><button data-game="resume">استئناف آخر حفظ</button><button data-game="fog" aria-pressed="true">ضباب الحرب</button><span class="battle-save-status" role="status"></span></div><label class="mobile-game-only mobile-volume">مستوى الصوت <input type="range" min="0" max="100" value="${Math.round(audio.volume * 100)}" aria-label="مستوى الصوت للجوال"></label><span class="campaign-progress"></span><button data-game="next">المرحلة التالية ←</button><small>تغيير المرحلة أو الخريطة أو المهمة أو الصعوبة يبدأ معركة جديدة</small></div>
-    <div class="rts-layout"><div class="battlefield"><canvas tabindex="0" aria-label="ساحة المعركة ثلاثية الأبعاد"></canvas><div class="scene-badge">3D · WEBGL</div><button class="field-expand" data-game="wide" aria-pressed="false">⛶ توسيع الميدان</button><div class="force-ribbon"></div><span class="mobile-game-only touch-hint">اسحب للتحريك · إصبعان للتقريب والتدوير</span><button class="mobile-game-only mobile-placement" data-game="place-touch">تأكيد البناء المقترح</button><button class="battle-minimap" aria-label="الخريطة المصغرة: انقر لتحريك الكاميرا" title="انقر لتحريك الكاميرا، Shift لإصدار أمر للجيش المحدد"></button><div class="camera-tools" aria-label="التحكم بالكاميرا"><button data-camera="in" aria-label="تقريب الكاميرا">＋</button><button data-camera="out" aria-label="إبعاد الكاميرا">−</button><button data-camera="left" aria-label="تدوير الكاميرا لليسار">↶</button><button data-camera="right" aria-label="تدوير الكاميرا لليمين">↷</button><button data-camera="focus" aria-label="التركيز على الجيش">◎</button><button data-camera="home" aria-label="إعادة ضبط الكاميرا">⌂</button></div><div class="rts-result hidden" role="status"></div></div>
+    <div class="rts-layout"><div class="battlefield"><canvas tabindex="0" aria-label="ساحة المعركة ثلاثية الأبعاد"></canvas><div class="scene-badge">3D · WEBGL</div><button class="field-expand" data-game="wide" aria-pressed="false">⛶ توسيع الميدان</button><button class="field-pan" data-game="pan" aria-label="وضع اليد لتحريك الخريطة" aria-pressed="false" title="اسحب بالزر الأيسر لتحريك الخريطة، واستخدم عجلة الفأرة للتقريب">✋ تحريك الخريطة</button><div class="force-ribbon"></div><span class="mobile-game-only touch-hint">اسحب للتحريك · إصبعان للتقريب والتدوير</span><button class="mobile-game-only mobile-placement" data-game="place-touch">تأكيد البناء المقترح</button><button class="battle-minimap" aria-label="الخريطة المصغرة: انقر لتحريك الكاميرا" title="انقر لتحريك الكاميرا، Shift لإصدار أمر للجيش المحدد"></button><div class="camera-tools" aria-label="التحكم بالكاميرا"><button data-camera="in" aria-label="تقريب الكاميرا">＋</button><button data-camera="out" aria-label="إبعاد الكاميرا">−</button><button data-camera="left" aria-label="تدوير الكاميرا لليسار">↶</button><button data-camera="right" aria-label="تدوير الكاميرا لليمين">↷</button><button data-camera="focus" aria-label="التركيز على الجيش">◎</button><button data-camera="home" aria-label="إعادة ضبط الكاميرا">⌂</button></div><div class="rts-result hidden" role="status"></div></div>
     <aside class="rts-panel" id="game-commands"><button class="mobile-game-only" data-game="multiselect" aria-pressed="false">تحديد متعدد باللمس</button><div class="map-preview"></div><div class="rts-mission"><span></span><h2></h2><p></p></div><h3>إنشاء مبانٍ</h3><div class="build-buttons"></div><button data-game="autoplace">بناء في مكان مقترح</button><div class="mission-objective"></div><p class="selected-logistics"></p><button data-game="service">عودة للصيانة والتسليح</button><h3>تدريب الوحدات</h3><div class="train-buttons"></div><p class="rts-help">اختر مبنى ثم انقر الأرض، أو استخدم المكان المقترح. حدد الوحدات ثم انقر للتحرك أو الهجوم. عجلة الفأرة للتقريب، والزر الأوسط لتدوير الكاميرا، وإصبعان على الهاتف.</p></aside></div>
     <nav class="battle-actions" aria-label="أوامر المعركة"><button data-game="commands" aria-expanded="false" aria-controls="game-commands">بناء وتدريب</button><button data-game="select">تحديد الجيش</button><button data-game="attack">هجوم على مقر العدو</button><button data-game="maps" aria-expanded="false" aria-controls="game-maps">الخرائط والصوت</button></nav>
     <footer class="rts-footer"><span class="rts-message" role="status"></span><span>أزرق: أنت · أحمر: العدو</span></footer><p class="campaign-save" role="status"></p><p class="sound-status" role="status">الصوت متوقف حتى تضغط «تشغيل الأصوات».</p>
@@ -75,6 +75,19 @@ export function setupGame(content, { network = null } = {}) {
     minimap = content.querySelector(".battle-minimap");
   let multiSelect = false;
   const shell = content.querySelector(".rts-app");
+  const panButton = content.querySelector('[data-game="pan"]');
+  let handMode = false;
+  function setHandMode(enabled) {
+    handMode = enabled;
+    shell.classList.toggle("pan-mode", handMode);
+    panButton.setAttribute("aria-pressed", String(handMode));
+    panButton.textContent = handMode ? "✋ إنهاء التحريك" : "✋ تحريك الخريطة";
+    battle.message = handMode
+      ? "وضع اليد: اسحب الميدان بالزر الأيسر، واستخدم عجلة الفأرة للتقريب أو الإبعاد"
+      : "وضع التحديد: اسحب لتحديد الجنود والآليات";
+    refresh();
+  }
+  panButton.onclick = () => setHandMode(!handMode);
   const compactLayout = matchMedia(COMPACT_QUERY);
   if (!compactLayout.matches) shell.classList.add("commands-open", "maps-open");
   content.querySelector("[data-game=wide]").onclick = () => {
@@ -608,14 +621,23 @@ export function setupGame(content, { network = null } = {}) {
     };
   let mouseStart = null;
   canvas.onpointerdown = (event) => {
-    if (
-      event.button === 1 ||
-      battle.paused ||
-      battle.status !== "playing" ||
-      !view
-    )
-      return;
+    if (event.button === 1 || !view) return;
     if (event.pointerType === "touch") return;
+    if (event.button === 0 && handMode) {
+      mouseStart = {
+        x: event.clientX,
+        y: event.clientY,
+        previousX: event.clientX,
+        previousY: event.clientY,
+        id: event.pointerId,
+        mode: "pan",
+      };
+      canvas.setPointerCapture(event.pointerId);
+      shell.classList.add("pan-dragging");
+      event.preventDefault();
+      return;
+    }
+    if (battle.paused || battle.status !== "playing") return;
     if (event.button === 2 || building || orderIntent) {
       interact(event);
       return;
@@ -652,6 +674,16 @@ export function setupGame(content, { network = null } = {}) {
   });
   canvas.onpointermove = (event) => {
     if (mouseStart && event.pointerId === mouseStart.id) {
+      if (mouseStart.mode === "pan") {
+        view?.panPixels(
+          event.clientX - mouseStart.previousX,
+          event.clientY - mouseStart.previousY,
+        );
+        mouseStart.previousX = event.clientX;
+        mouseStart.previousY = event.clientY;
+        event.preventDefault();
+        return;
+      }
       mouseStart.dragged ||=
         Math.hypot(event.clientX - mouseStart.x, event.clientY - mouseStart.y) >
         6;
@@ -694,6 +726,11 @@ export function setupGame(content, { network = null } = {}) {
     if (mouseStart && event.pointerId === mouseStart.id) {
       const from = mouseStart;
       mouseStart = null;
+      if (from.mode === "pan") {
+        shell.classList.remove("pan-dragging");
+        canvas.releasePointerCapture(event.pointerId);
+        return;
+      }
       if (from.dragged) {
         const r = canvas.getBoundingClientRect();
         extraUI.selectBox(
@@ -749,6 +786,7 @@ export function setupGame(content, { network = null } = {}) {
   };
   canvas.onpointercancel = (event) => {
     mouseStart = null;
+    shell.classList.remove("pan-dragging");
     extraUI.selectBox(null);
     fingers.delete(event.pointerId);
     if (fingers.size === 0) touchGesture = false;
@@ -817,6 +855,7 @@ export function setupGame(content, { network = null } = {}) {
   content.onkeydown = (e) => {
     if (tacticalUI?.key(e)) return;
     if (e.key === "Escape") {
+      setHandMode(false);
       building = null;
       orderIntent = null;
       shell.classList.remove("maps-open", "commands-open");
